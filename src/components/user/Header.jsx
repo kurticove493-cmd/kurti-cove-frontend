@@ -5,79 +5,61 @@ import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSelector, useDispatch } from 'react-redux'
 import {
   FiShoppingCart, FiMenu, FiX,
-  FiLogOut, FiPackage, FiChevronRight, FiSearch,
+  FiLogOut, FiPackage, FiChevronRight,
+  FiSearch, FiChevronDown,
 } from 'react-icons/fi'
 import { AiOutlineHeart, AiFillHeart } from 'react-icons/ai'
-import { ChevronDown, User, Settings } from 'lucide-react'
+import { User, Settings } from 'lucide-react'
 import { resetCart } from '../../redux/features/CartSlice'
 import API from '../../utils/Helper'
 
-/* ─────────────────────────────────────────────────────────────
-   THEME TOKENS — change one value here to retheme the header
-───────────────────────────────────────────────────────────────*/
-const THEME = {
-  // Header gradient — soft rose pink → peach
-  grad: 'linear-gradient(125deg, #F8A5B5 0%, #FBCBB0 50%, #FBDBBB 100%)',
-  // Pill shadow (warm rose glow)
-  pillShadow: '0 8px 36px rgba(224,92,136,0.28)',
-  pillBorder: 'rgba(123,36,71,0.18)',
-  // Text / icons — deep berry on pastel bg
-  textIvory:  '#7B2447',
-  textMuted:  'rgba(123,36,71,0.60)',
-  // Active accent
-  accentGold:  '#E05C88',
-  accentUnder: '#C94A74',
-  // Badges — mint with berry numbers
-  cartBadge:     '#B5EDDB',
-  cartBadgeText: '#7B2447',
+/* ── palette ─────────────────────────────────────── */
+const C = {
+  purple:    '#6B2D8B',
+  purpleLt:  '#f3e8ff',
+  text:      '#1a1a1a',
+  muted:     'rgba(26,26,26,0.45)',
+  border:    'rgba(0,0,0,0.09)',
+  white:     '#ffffff',
 }
 
-/*
-  CSS variable block — injected once so future palette tweaks
-  are genuinely one-liner changes at the top of this file.
-*/
-const CSS_VARS = `
-  :root {
-    --hdr-grad:        ${THEME.grad};
-    --hdr-pill-shadow: ${THEME.pillShadow};
-    --hdr-pill-border: ${THEME.pillBorder};
-    --hdr-radius-flat: 0px;
-    --hdr-radius-pill: 50px;
-    --hdr-inset-mobile: 12px;
-    --hdr-inset-desk:   20px;
-    --hdr-mt-pill:      10px;
-  }
-  .kc-header-wrapper {
-    transition:
-      border-radius 0.35s cubic-bezier(0.4,0,0.2,1),
-      left          0.35s cubic-bezier(0.4,0,0.2,1),
-      right         0.35s cubic-bezier(0.4,0,0.2,1),
-      top           0.35s cubic-bezier(0.4,0,0.2,1),
-      box-shadow    0.35s cubic-bezier(0.4,0,0.2,1),
-      border        0.35s cubic-bezier(0.4,0,0.2,1);
-  }
-`
-
-const navLinks = [
-  { label: 'Home',         href: '/' },
-  { label: 'Shop',         href: '/shop' },
-  { label: 'New Arrivals', href: '/shop?filter=isNewArrival' },
-  { label: 'Best Sellers', href: '/shop?filter=isBestSeller' },
+/* ── drawer menu items — Libas style ─────────────── */
+const MENU_SECTIONS = [
+  {
+    label: 'Shop by Categories',
+    href:  '/shop',
+    hasChevron: true,
+  },
+  {
+    label: 'New Arrivals',
+    href:  '/shop?filter=isNewArrival',
+    hasChevron: true,
+  },
+  {
+    label: 'Best Sellers',
+    href:  '/shop?filter=isBestSeller',
+    hasChevron: true,
+  },
+  {
+    label: 'Sale',
+    href:  '/shop?filter=onSale',
+    hasChevron: true,
+  },
+  {
+    label: 'All Products',
+    href:  '/shop',
+    hasChevron: false,
+  },
 ]
 
 const WL_KEY = 'kc_wishlist'
 
-/* ── Profile initial avatar ──────────────────────────────────*/
 function AvatarInitial({ name }) {
   const initial = (name || 'U')[0].toUpperCase()
   return (
     <span
-      className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ring-1"
-      style={{
-        background: 'linear-gradient(135deg,#E05C88,#F8A5B5)',
-        color: '#fff',
-        ringColor: 'rgba(123,36,71,0.25)',
-      }}
+      className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
+      style={{ background: C.purple, color: '#fff' }}
     >
       {initial}
     </span>
@@ -85,7 +67,6 @@ function AvatarInitial({ name }) {
 }
 
 function HeaderInner() {
-  const [scrolled,    setScrolled]    = useState(false)
   const [menuOpen,    setMenuOpen]    = useState(false)
   const [userMenu,    setUserMenu]    = useState(false)
   const [user,        setUser]        = useState(null)
@@ -93,68 +74,55 @@ function HeaderInner() {
   const [searchOpen,  setSearchOpen]  = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
-  /* Badge counts unique line items (not total quantity) */
-  const cartItems    = useSelector((s) => s.cart.items)
-  const cartBadge    = cartItems.length   // unique products in cart
-  const dispatch     = useDispatch()
-  const pathname     = usePathname()
-  const router       = useRouter()
+  const cartItems = useSelector((s) => s.cart.items)
+  const cartBadge = cartItems.length
+  const dispatch  = useDispatch()
+  const pathname  = usePathname()
+  const router    = useRouter()
   const searchParams = useSearchParams()
 
-  const userMenuRef  = useRef(null)
-  const searchRef    = useRef(null)
-  const searchInput  = useRef(null)
+  const userMenuRef = useRef(null)
+  const searchInput = useRef(null)
 
-  /* ── Auth state ──────────────────────────────────────────── */
+  /* auth */
   useEffect(() => {
-    const readUser = () => {
-      const token    = localStorage.getItem('kc_token')
-      const userData = localStorage.getItem('kc_user')
-      if (token && userData) {
-        try { setUser(JSON.parse(userData)) } catch {}
-      } else {
-        setUser(null)
-      }
+    const read = () => {
+      const token = localStorage.getItem('kc_token')
+      const data  = localStorage.getItem('kc_user')
+      if (token && data) { try { setUser(JSON.parse(data)) } catch {} }
+      else setUser(null)
     }
-    readUser()
-    window.addEventListener('kc-auth-changed', readUser)
-    window.addEventListener('storage', readUser)
+    read()
+    window.addEventListener('kc-auth-changed', read)
+    window.addEventListener('storage', read)
     return () => {
-      window.removeEventListener('kc-auth-changed', readUser)
-      window.removeEventListener('storage', readUser)
+      window.removeEventListener('kc-auth-changed', read)
+      window.removeEventListener('storage', read)
     }
   }, [])
 
-  /* ── Wishlist — live badge ──────────────────────────────────
-     Reads from localStorage on mount, then re-reads whenever
-     any component dispatches 'kc-wishlist-changed' (same tab)
-     or localStorage changes in another tab ('storage' event).
-  ────────────────────────────────────────────────────────────*/
+  /* wishlist */
   useEffect(() => {
-    const readWishlist = () => {
-      try {
-        const s = localStorage.getItem(WL_KEY)
-        setWishlist(s ? JSON.parse(s) : [])
-      } catch { setWishlist([]) }
+    const read = () => {
+      try { const s = localStorage.getItem(WL_KEY); setWishlist(s ? JSON.parse(s) : []) }
+      catch { setWishlist([]) }
     }
-    readWishlist()
-    window.addEventListener('kc-wishlist-changed', readWishlist)
-    window.addEventListener('storage', readWishlist)
+    read()
+    window.addEventListener('kc-wishlist-changed', read)
+    window.addEventListener('storage', read)
     return () => {
-      window.removeEventListener('kc-wishlist-changed', readWishlist)
-      window.removeEventListener('storage', readWishlist)
+      window.removeEventListener('kc-wishlist-changed', read)
+      window.removeEventListener('storage', read)
     }
   }, [])
 
-  /* ── Scroll ──────────────────────────────────────────────── */
+  /* lock body scroll when menu/drawer open */
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 15)
-    onScroll()
-    window.addEventListener('scroll', onScroll, { passive: true })
-    return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+    document.body.style.overflow = menuOpen ? 'hidden' : ''
+    return () => { document.body.style.overflow = '' }
+  }, [menuOpen])
 
-  /* ── Outside clicks ──────────────────────────────────────── */
+  /* outside click — user dropdown */
   useEffect(() => {
     const h = (e) => {
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) setUserMenu(false)
@@ -163,24 +131,12 @@ function HeaderInner() {
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  useEffect(() => {
-    const h = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) setSearchOpen(false)
-    }
-    document.addEventListener('mousedown', h)
-    return () => document.removeEventListener('mousedown', h)
-  }, [])
-
+  /* focus search input */
   useEffect(() => {
     if (searchOpen && searchInput.current) searchInput.current.focus()
   }, [searchOpen])
 
-  useEffect(() => {
-    document.body.style.overflow = menuOpen ? 'hidden' : ''
-    return () => { document.body.style.overflow = '' }
-  }, [menuOpen])
-
-  /* ── Logout ──────────────────────────────────────────────── */
+  /* logout */
   const handleLogout = async () => {
     try { await API.post('/user/logout') } catch {}
     localStorage.removeItem('kc_token')
@@ -192,447 +148,482 @@ function HeaderInner() {
     window.location.href = '/'
   }
 
-  /* ── Search ──────────────────────────────────────────────── */
-  const handleSearch = useCallback(
-    (e) => {
-      e.preventDefault()
-      const q = searchQuery.trim()
-      if (!q) return
-      setSearchOpen(false)
-      setSearchQuery('')
-      router.push(`/shop?search=${encodeURIComponent(q)}`)
-    },
-    [searchQuery, router]
-  )
-
-  /* ── Derived styles ──────────────────────────────────────── */
-  const wrapperStyle = scrolled
-    ? {
-        // PILL STATE
-        position:     'fixed',
-        top:          '10px',
-        left:         '16px',
-        right:        '16px',
-        zIndex:       60,
-        borderRadius: '50px',
-        background:   THEME.grad,
-        boxShadow:    THEME.pillShadow,
-        border:       `1px solid ${THEME.pillBorder}`,
-        overflow:     'visible',
-      }
-    : {
-        // FLAT STATE
-        position:     'fixed',
-        top:          '0',
-        left:         '0',
-        right:        '0',
-        zIndex:       60,
-        borderRadius: '0px',
-        background:   THEME.grad,
-        boxShadow:    'none',
-        border:       'none',
-        borderBottom: '1px solid rgba(123,36,71,0.14)',
-        overflow:     'visible',
-      }
-
-  // Icon button base
-  const iconBtn = 'relative flex items-center justify-center rounded-full p-1.5 md:p-2 transition-all duration-200'
-  const iconBtnStyle = { color: THEME.textIvory }
+  /* search */
+  const handleSearch = useCallback((e) => {
+    e.preventDefault()
+    const q = searchQuery.trim()
+    if (!q) return
+    setSearchOpen(false)
+    setSearchQuery('')
+    router.push(`/shop?search=${encodeURIComponent(q)}`)
+  }, [searchQuery, router])
 
   return (
     <>
-      {/* Inject CSS variables and transition rule once */}
-      <style>{CSS_VARS}</style>
+      <style>{`
+        /* ── Header always fixed, flat, white ── */
+        .kc-hdr {
+          position: fixed;
+          top: 0; left: 0; right: 0;
+          z-index: 100;
+          background: #ffffff;
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+          height: 56px;
+        }
+        @media (min-width: 768px) {
+          .kc-hdr { height: 68px; }
+        }
 
-      {/* ═══ HEADER — single fixed element, pill animates here ══════ */}
-      <div className="kc-header-wrapper" style={wrapperStyle}>
-        {/* Inner layout container */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-14 md:h-20">
+        /* ── Logo — Playfair italic centered ── */
+        .kc-logo img {
+          height: 36px;
+        }
+        @media (min-width: 768px) {
+          .kc-logo img { height: 46px; }
+        }
 
-            {/* ── LOGO ──────────────────────────────────────── */}
-            <Link href="/" className="flex items-center self-center flex-shrink-0 min-w-fit">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src="/logo.png"
-                alt="Kurti Cove"
-                className="h-7 md:h-12 w-auto object-contain brightness-[1.25] drop-shadow"
-                draggable={false}
-                loading="eager"
-              />
-            </Link>
+        /* ── Left / right text items (MENU, SEARCH, CONTACT US) ── */
+        .kc-txt-btn {
+          font-family: Poppins, sans-serif;
+          font-size: 0.7rem;
+          font-weight: 500;
+          letter-spacing: 0.12em;
+          text-transform: uppercase;
+          color: #1a1a1a;
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          cursor: pointer;
+          background: none;
+          border: none;
+          padding: 4px 2px;
+          transition: color 0.18s;
+          text-decoration: none;
+          white-space: nowrap;
+        }
+        .kc-txt-btn:hover { color: #6B2D8B; }
 
-            {/* ── DESKTOP NAV ───────────────────────────────── */}
-            <nav className="hidden md:flex items-center gap-1 lg:gap-2">
-              {navLinks.map((link) => {
-                /*
-                  MUTUALLY EXCLUSIVE active logic:
-                  ─────────────────────────────────────────────
-                  • Home         → pathname === '/'
-                  • Shop         → pathname === '/shop' AND no ?filter param in URL
-                  • New Arrivals → pathname === '/shop' AND ?filter=isNewArrival
-                  • Best Sellers → pathname === '/shop' AND ?filter=isBestSeller
-                  ─────────────────────────────────────────────
-                  This prevents Shop + New Arrivals from being
-                  simultaneously active when ?filter= is present.
-                */
-                const currentFilter = searchParams.get('filter') || ''
+        /* ── Icon buttons ── */
+        .kc-icon-btn {
+          position: relative;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 6px;
+          color: #1a1a1a;
+          border-radius: 50%;
+          border: none;
+          background: none;
+          cursor: pointer;
+          transition: color 0.18s;
+        }
+        .kc-icon-btn:hover { color: #6B2D8B; }
 
-                let isActive
-                if (link.href === '/') {
-                  isActive = pathname === '/'
-                } else if (link.href === '/shop') {
-                  // Active ONLY on /shop with no filter param
-                  isActive = pathname === '/shop' && currentFilter === ''
-                } else {
-                  // Filtered nav items — match exact filter value
-                  const [, query] = link.href.split('?')
-                  const filterVal = new URLSearchParams(query).get('filter')
-                  isActive = pathname === '/shop' && currentFilter === filterVal
-                }
+        /* ── Badge ── */
+        .kc-badge {
+          position: absolute;
+          top: 0; right: 0;
+          font-size: 8px;
+          font-weight: 700;
+          border-radius: 9999px;
+          min-width: 15px;
+          height: 15px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 2px;
+          line-height: 1;
+          background: #6B2D8B;
+          color: #fff;
+        }
 
-                return (
-                  <span key={link.href} className="group relative">
-                    <Link
-                      href={link.href}
-                      className="relative px-3 py-1 text-sm font-medium transition-colors duration-200"
-                      style={{ color: isActive ? THEME.accentGold : THEME.textIvory }}
-                    >
-                      {link.label}
-                      <span
-                        className="absolute bottom-0 left-0 h-0.5 rounded-full transition-all duration-300"
-                        style={{
-                          background: THEME.accentUnder,
-                          width: isActive ? '100%' : '0%',
-                        }}
-                      />
-                    </Link>
-                  </span>
-                )
-              })}
-            </nav>
+        /* ── Search bar dropdown ── */
+        .kc-search-drop {
+          position: fixed;
+          top: 56px;
+          left: 0;
+          right: 0;
+          width: 100%;
+          background: #fff;
+          border-bottom: 1px solid rgba(107,45,139,0.18);
+          box-shadow: 0 8px 24px rgba(107,45,139,0.12);
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 10px 16px;
+          z-index: 200;
+        }
+        @media (min-width: 768px) {
+          .kc-search-drop {
+            position: absolute;
+            top: calc(100% + 8px);
+            left: 50%;
+            right: auto;
+            width: 360px;
+            transform: translateX(-50%);
+            border-bottom: none;
+            border: 1px solid rgba(107,45,139,0.18);
+            border-radius: 40px;
+            box-shadow: 0 8px 24px rgba(107,45,139,0.12);
+          }
+        }
 
-            {/* ── RIGHT ICONS ───────────────────────────────── */}
-            <div
-              className="flex items-center justify-end gap-1 md:gap-2.5 ml-auto md:ml-0"
-              ref={searchRef}
+        /* ── Full-screen menu overlay ── */
+        .kc-menu-overlay {
+          position: fixed;
+          inset: 0;
+          background: rgba(0,0,0,0.45);
+          z-index: 150;
+          opacity: 0;
+          pointer-events: none;
+          transition: opacity 0.28s ease;
+        }
+        .kc-menu-overlay.open {
+          opacity: 1;
+          pointer-events: auto;
+        }
+
+        /* ── Drawer panel — Libas: slides from LEFT, white, full height ── */
+        .kc-drawer {
+          position: fixed;
+          top: 0; left: 0;
+          height: 100%;
+          width: 320px;
+          max-width: 88vw;
+          background: #ffffff;
+          z-index: 160;
+          display: flex;
+          flex-direction: column;
+          transform: translateX(-100%);
+          transition: transform 0.3s cubic-bezier(0.4,0,0.2,1);
+          box-shadow: 4px 0 24px rgba(0,0,0,0.12);
+        }
+        .kc-drawer.open { transform: translateX(0); }
+
+        /* ── Drawer: top user strip ── */
+        .kc-drawer-user {
+          display: flex;
+          align-items: center;
+          gap: 14px;
+          padding: 20px 20px 16px;
+          border-bottom: 1px solid rgba(0,0,0,0.08);
+        }
+        .kc-drawer-login-label {
+          font-family: Poppins, sans-serif;
+          font-size: 0.85rem;
+          font-weight: 600;
+          letter-spacing: 0.1em;
+          text-transform: uppercase;
+          color: #1a1a1a;
+        }
+
+        /* ── Drawer nav rows ── */
+        .kc-drawer-row {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          padding: 15px 20px;
+          border-bottom: 1px solid rgba(0,0,0,0.07);
+          font-family: Poppins, sans-serif;
+          font-size: 0.78rem;
+          font-weight: 600;
+          letter-spacing: 0.10em;
+          text-transform: uppercase;
+          color: #1a1a1a;
+          text-decoration: none;
+          cursor: pointer;
+          background: none;
+          border-left: none;
+          border-right: none;
+          border-top: none;
+          width: 100%;
+          transition: background 0.15s, color 0.15s;
+        }
+        .kc-drawer-row:hover {
+          background: #f9f0ff;
+          color: #6B2D8B;
+        }
+        .kc-drawer-row.active {
+          color: #6B2D8B;
+        }
+
+        /* Spacer below header */
+        .kc-spacer {
+          height: 56px;
+          width: 100%;
+        }
+        @media (min-width: 768px) {
+          .kc-spacer { height: 68px; }
+        }
+
+        /* Hide contact-us and user/login on mobile */
+        .kc-desktop-only {
+          display: none !important;
+        }
+        @media (min-width: 768px) {
+          .kc-desktop-only {
+            display: inline-flex !important;
+          }
+        }
+        .kc-desktop-only-block {
+          display: none !important;
+        }
+        @media (min-width: 768px) {
+          .kc-desktop-only-block {
+            display: block !important;
+          }
+        }
+      `}</style>
+
+      {/* ══════════ HEADER BAR ══════════ */}
+      <header className="kc-hdr">
+        <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+
+          {/* ── LEFT ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 20, flex: 1 }}>
+            {/* Single MENU button — desktop shows text, mobile shows icon only */}
+            <button
+              onClick={() => setMenuOpen(true)}
+              className="kc-txt-btn"
+              aria-label="Open menu"
             >
+              <FiMenu size={15} strokeWidth={1.9} />
+              <span className="hidden sm:inline">Menu</span>
+            </button>
 
-              {/* 1 — Search */}
-              <div className="relative">
-                <button
-                  onClick={() => setSearchOpen((v) => !v)}
-                  title="Search"
-                  aria-label="Toggle search"
-                  className={`${iconBtn} hover:bg-white/10`}
-                  style={iconBtnStyle}
-                >
-                  <FiSearch className="w-[18px] h-[18px] md:w-[21px] md:h-[21px]" />
-                </button>
-
-                {searchOpen && (
-                  <form
-                    onSubmit={handleSearch}
-                    className="absolute top-full right-0 mt-2 z-[70] hidden md:flex"
-                  >
-                    <div className="flex items-center gap-2 rounded-full px-4 py-2.5 w-72 lg:w-80"
-                         style={{
-                           background: '#fff',
-                           boxShadow: '0 8px 24px rgba(224,92,136,0.18)',
-                           border: '1px solid #F5C8D4',
-                         }}>
-                      <FiSearch size={14} className="flex-shrink-0" style={{ color: '#E05C88' }} />
-                      <input
-                        ref={searchInput}
-                        type="text"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        placeholder="Search kurtis..."
-                        className="flex-1 text-sm bg-transparent outline-none font-sans"
-                        style={{ color: '#7B2447' }}
-                      />
-                      {searchQuery && (
-                        <button type="button" onClick={() => setSearchQuery('')}
-                          style={{ color: '#F8A5B5' }}>
-                          <FiX size={12} />
-                        </button>
-                      )}
-                    </div>
-                  </form>
-                )}
-              </div>
-
-              {/* 2 — Wishlist */}
-              <Link
-                href="/wishlist"
-                title="Wishlist"
-                aria-label="Wishlist"
-                className={`${iconBtn} hidden sm:flex hover:bg-white/10`}
-                style={iconBtnStyle}
-              >
-                {wishlist.length > 0
-                  ? <AiFillHeart className="w-[18px] h-[18px] md:w-[21px] md:h-[21px] text-[red]" />
-                  : <AiOutlineHeart className="w-[18px] h-[18px] md:w-[21px] md:h-[21px]" />
-                }
-                {wishlist.length > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-0.5 leading-none"
-                        style={{ background: THEME.cartBadge, color: THEME.cartBadgeText }}>
-                    {wishlist.length > 9 ? '9+' : wishlist.length}
-                  </span>
-                )}
-              </Link>
-
-              {/* 3 — Cart */}
-              <Link href="/cart" title="Cart" aria-label="Cart"
-                className={`${iconBtn} hover:bg-white/10`}
-                style={iconBtnStyle}>
-                <FiShoppingCart className="w-[18px] h-[18px] md:w-[21px] md:h-[21px]" />
-                {cartBadge > 0 && (
-                  <span className="absolute -top-0.5 -right-0.5 text-[8px] font-bold rounded-full min-w-[15px] h-[15px] flex items-center justify-center px-0.5 leading-none"
-                        style={{ background: THEME.cartBadge, color: THEME.cartBadgeText }}>
-                    {cartBadge > 99 ? '99+' : cartBadge}
-                  </span>
-                )}
-              </Link>
-
-              {/* 4 — Profile chip / Login */}
-              {user ? (
-                <div className="relative" ref={userMenuRef}>
-                  <button
-                    onClick={() => setUserMenu((v) => !v)}
-                    title="Profile"
-                    aria-label="Profile menu"
-                    className="flex items-center gap-1.5 pl-1 pr-2.5 py-1 rounded-full transition-all duration-200 hover:brightness-125"
-                    style={{
-                      background: 'rgba(255,255,255,0.12)',
-                      border:     '1px solid rgba(255,255,255,0.20)',
-                    }}
-                  >
-                    <AvatarInitial name={user.name} />
-                    <span className="hidden sm:block text-sm font-medium max-w-[60px] truncate"
-                          style={{ color: THEME.textIvory }}>
-                      {user.name?.split(' ')[0]}
-                    </span>
-                    <ChevronDown
-                      size={13}
-                      strokeWidth={2.5}
-                      style={{ color: THEME.textMuted }}
-                      className={`transition-transform duration-200 ${userMenu ? 'rotate-180' : ''}`}
-                    />
-                  </button>
-
-                  {/* Dropdown — clean white card, z-[70] clears wrapper stacking context */}
-                  {userMenu && (
-                    <div className="absolute right-0 mt-2 w-56 bg-white rounded-2xl overflow-hidden z-[70]"
-                         style={{ boxShadow: '0 8px 30px rgba(224,92,136,0.18)', border: '1px solid #F5C8D4' }}>
-                      <div className="px-4 py-3 border-b border-pink-50"
-                           style={{ background: '#FEF0E3' }}>
-                        <p className="text-xs font-sans" style={{ color: '#6B4553' }}>Signed in as</p>
-                        <p className="text-sm font-semibold truncate" style={{ color: '#7B2447' }}>{user.email}</p>
-                      </div>
-                      {[
-                        { href: '/profile', Icon: User,      label: 'My Profile', sz: 15 },
-                        { href: '/orders',  Icon: FiPackage, label: 'My Orders',  sz: 15 },
-                      ].map(({ href, Icon, label, sz }) => (
-                        <Link
-                          key={href}
-                          href={href}
-                          onClick={() => setUserMenu(false)}
-                          className="flex items-center justify-between px-4 py-2.5 text-sm transition-colors group"
-                          style={{ color: '#7B2447' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#FEF0E3'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <span className="flex items-center gap-2">
-                            <Icon size={sz} style={{ color: '#E05C88' }} />
-                            {label}
-                          </span>
-                          <FiChevronRight size={13} style={{ color: '#F8A5B5' }} className="opacity-0 group-hover:opacity-100 transition-opacity" />
-                        </Link>
-                      ))}
-                      {(user.role === 'admin' || user.role === 'superAdmin') && (
-                        <Link
-                          href="/admin/products"
-                          onClick={() => setUserMenu(false)}
-                          className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors"
-                          style={{ color: '#E05C88' }}
-                          onMouseEnter={e => e.currentTarget.style.background = '#FEF0E3'}
-                          onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
-                        >
-                          <Settings size={15} style={{ color: '#E05C88' }} /> Admin Panel
-                        </Link>
-                      )}
-                      <button
-                        onClick={handleLogout}
-                        className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors border-t"
-                        style={{ borderColor: '#F5C8D4' }}
-                      >
-                        <FiLogOut size={14} /> Logout
-                      </button>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                /* Logged-out: ivory-outlined Login pill */
-                <Link
-                  href="/login"
-                  title="Login"
-                  className="flex items-center gap-1.5 px-3 md:px-4 py-1.5 rounded-full text-sm font-semibold transition-all duration-200 hover:brightness-125"
-                  style={{
-                    color:      THEME.textIvory,
-                    border:     `1.5px solid rgba(255,243,246,0.55)`,
-                    background: 'rgba(255,255,255,0.10)',
-                  }}
-                >
-                  <User size={15} strokeWidth={2.5} />
-                  <span className="hidden sm:inline">Login</span>
-                </Link>
-              )}
-
-              {/* Hamburger — mobile only */}
+            {/* SEARCH — desktop: text+icon; mobile: icon only */}
+            <div style={{ position: 'relative' }}>
               <button
-                onClick={() => setMenuOpen(true)}
-                aria-label="Open menu"
-                className={`md:hidden ${iconBtn} hover:bg-white/10`}
-                style={iconBtnStyle}
+                onClick={() => setSearchOpen(v => !v)}
+                className="kc-txt-btn"
+                aria-label="Search"
               >
-                <FiMenu className="w-[18px] h-[18px]" />
+                <FiSearch size={14} strokeWidth={1.9} />
+                <span className="hidden sm:inline">Search</span>
               </button>
+
+              {/* Search dropdown */}
+              {searchOpen && (
+                <form onSubmit={handleSearch} className="kc-search-drop">
+                  <FiSearch size={14} style={{ color: C.purple, flexShrink: 0 }} />
+                  <input
+                    ref={searchInput}
+                    type="text"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search kurtis..."
+                    style={{ flex: 1, fontSize: '0.85rem', background: 'transparent', outline: 'none', color: '#1a1a1a', fontFamily: 'Poppins, sans-serif' }}
+                  />
+                  {searchQuery && (
+                    <button type="button" onClick={() => setSearchQuery('')} style={{ color: C.purple }}>
+                      <FiX size={12} />
+                    </button>
+                  )}
+                </form>
+              )}
             </div>
           </div>
-        </div>
 
-        {/* Mobile search strip */}
-        {searchOpen && (
-          <div className="md:hidden px-4 py-2 border-t" style={{ borderColor: 'rgba(123,36,71,0.14)' }}>
-            <form
-              onSubmit={handleSearch}
-              className="flex items-center gap-2 rounded-full px-4 py-2"
-              style={{ background: 'rgba(255,255,255,0.55)', border: '1px solid rgba(123,36,71,0.18)' }}
-            >
-              <FiSearch size={14} style={{ color: '#7B2447' }} className="flex-shrink-0" />
-              <input
-                type="text"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search kurtis..."
-                className="flex-1 text-sm bg-transparent outline-none font-sans"
-                style={{ color: '#7B2447' }}
-                autoFocus
-              />
-              {searchQuery && (
-                <button type="button" onClick={() => setSearchQuery('')} style={{ color: '#6B4553' }}>
-                  <FiX size={12} />
-                </button>
-              )}
-            </form>
+          {/* ── CENTER — Logo ── */}
+          <div className="kc-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: '0 12px' }}>
+            <Link href="/">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo.png" alt="Kurti Cove" draggable={false} loading="eager" style={{ objectFit: 'contain' }} />
+            </Link>
           </div>
-        )}
-      </div>{/* end kc-header-wrapper */}
 
-      {/* SPACER — fixed height so page content never jumps */}
-      <div className="h-14 md:h-20 w-full" aria-hidden="true" />
+          {/* ── RIGHT ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, flex: 1, justifyContent: 'flex-end' }}>
+            {/* CONTACT US — desktop only */}
+            <Link href="/contact" className="kc-txt-btn kc-desktop-only" style={{ marginRight: 4 }}>
+              Contact Us
+            </Link>
 
-      {/* ═══════════════ MOBILE DRAWER ═══════════════════════════ */}
+            {/* Profile / Login — desktop only, right after Contact Us */}
+            {user ? (
+              <div className="kc-desktop-only-block" style={{ position: 'relative' }} ref={userMenuRef}>
+                <button
+                  onClick={() => setUserMenu(v => !v)}
+                  className="kc-icon-btn"
+                  aria-label="Profile"
+                  style={{ gap: 4 }}
+                >
+                  <AvatarInitial name={user.name} />
+                </button>
+
+                {userMenu && (
+                  <div style={{
+                    position: 'absolute', right: 0, top: 'calc(100% + 8px)',
+                    width: 220, background: '#fff', borderRadius: 14, overflow: 'hidden',
+                    boxShadow: '0 8px 28px rgba(107,45,139,0.14)',
+                    border: '1px solid rgba(107,45,139,0.12)', zIndex: 200,
+                  }}>
+                    <div style={{ padding: '12px 16px', background: '#f9f0ff', borderBottom: '1px solid rgba(107,45,139,0.10)' }}>
+                      <p style={{ fontSize: '0.7rem', color: C.purple, fontFamily: 'Poppins, sans-serif' }}>Signed in as</p>
+                      <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#3d1557', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'Poppins, sans-serif' }}>{user.email}</p>
+                    </div>
+                    {[
+                      { href: '/profile', Icon: User,      label: 'My Profile' },
+                      { href: '/orders',  Icon: FiPackage, label: 'My Orders' },
+                    ].map(({ href, Icon, label }) => (
+                      <Link key={href} href={href} onClick={() => setUserMenu(false)}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', fontSize: '0.82rem', color: '#1a1a1a', textDecoration: 'none', fontFamily: 'Poppins, sans-serif', transition: 'background 0.15s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f9f0ff'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <Icon size={14} style={{ color: C.purple }} />{label}
+                        </span>
+                        <FiChevronRight size={12} style={{ color: C.purple, opacity: 0.5 }} />
+                      </Link>
+                    ))}
+                    {(user.role === 'admin' || user.role === 'superAdmin') && (
+                      <Link href="/admin/products" onClick={() => setUserMenu(false)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', fontSize: '0.82rem', color: C.purple, textDecoration: 'none', fontFamily: 'Poppins, sans-serif' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f9f0ff'}
+                        onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                      >
+                        <Settings size={14} style={{ color: C.purple }} /> Admin Panel
+                      </Link>
+                    )}
+                    <button onClick={handleLogout}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 16px', fontSize: '0.82rem', color: '#ef4444', background: 'none', border: 'none', borderTop: '1px solid rgba(107,45,139,0.10)', cursor: 'pointer', fontFamily: 'Poppins, sans-serif' }}
+                      onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'none'}
+                    >
+                      <FiLogOut size={13} /> Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link href="/login" className="kc-icon-btn kc-desktop-only" aria-label="Login">
+                <User size={19} strokeWidth={1.8} />
+              </Link>
+            )}
+
+            {/* Wishlist — always visible on all screen sizes */}
+            <Link href="/wishlist" className="kc-icon-btn" aria-label="Wishlist">
+              {wishlist.length > 0
+                ? <AiFillHeart size={20} style={{ color: C.purple }} />
+                : <AiOutlineHeart size={20} />}
+              {wishlist.length > 0 && (
+                <span className="kc-badge">{wishlist.length > 9 ? '9+' : wishlist.length}</span>
+              )}
+            </Link>
+
+            {/* Cart — always visible on all screen sizes */}
+            <Link href="/cart" className="kc-icon-btn" aria-label="Cart">
+              <FiShoppingCart size={19} strokeWidth={1.8} />
+              {cartBadge > 0 && (
+                <span className="kc-badge">{cartBadge > 99 ? '99+' : cartBadge}</span>
+              )}
+            </Link>
+          </div>
+        </div>
+      </header>
+
+      {/* Spacer so content doesn't hide under fixed header */}
+      <div className="kc-spacer" aria-hidden="true" />
+
+      {/* ══════════ MENU OVERLAY ══════════ */}
       <div
+        className={`kc-menu-overlay${menuOpen ? ' open' : ''}`}
         onClick={() => setMenuOpen(false)}
-        className={[
-          'fixed inset-0 z-[60] bg-black/60 backdrop-blur-sm transition-opacity duration-300 md:hidden',
-          menuOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none',
-        ].join(' ')}
+        aria-hidden="true"
       />
 
-      <aside
-        className={[
-          'fixed top-0 left-0 h-full w-72 max-w-[82vw] z-[70] shadow-2xl',
-          'transform transition-transform duration-300 ease-in-out md:hidden flex flex-col',
-          menuOpen ? 'translate-x-0' : '-translate-x-full',
-        ].join(' ')}
-        style={{ background: THEME.grad }}      >
-        {/* Drawer header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo.png" alt="Kurti Cove" className="h-10 w-auto object-contain brightness-125" draggable={false} />
+      {/* ══════════ DRAWER ══════════ */}
+      <aside className={`kc-drawer${menuOpen ? ' open' : ''}`} aria-label="Navigation menu">
+
+        {/* Top: user strip */}
+        <div className="kc-drawer-user">
+          {/* Avatar / login icon */}
+          <div style={{
+            width: 44, height: 44, borderRadius: '50%',
+            background: C.purple,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            flexShrink: 0,
+          }}>
+            <User size={22} color="#fff" strokeWidth={1.8} />
+          </div>
+          <div style={{ flex: 1 }}>
+            {user ? (
+              <>
+                <div style={{ fontSize: '0.7rem', color: C.muted, fontFamily: 'Poppins, sans-serif', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Hello</div>
+                <div style={{ fontSize: '0.85rem', fontWeight: 600, color: '#1a1a1a', fontFamily: 'Poppins, sans-serif' }}>{user.name || user.email}</div>
+              </>
+            ) : (
+              <Link href="/login" onClick={() => setMenuOpen(false)}>
+                <span className="kc-drawer-login-label">Log In</span>
+              </Link>
+            )}
+          </div>
           <button
             onClick={() => setMenuOpen(false)}
             aria-label="Close menu"
-            className="p-2 rounded-full hover:bg-white/10 transition-colors"
-            style={{ color: THEME.textIvory }}
+            style={{ padding: 6, color: '#1a1a1a', background: 'none', border: 'none', cursor: 'pointer', borderRadius: '50%' }}
           >
             <FiX size={20} />
           </button>
         </div>
 
-        {/* Drawer nav */}
-        <nav className="flex-1 px-4 py-5 space-y-1 overflow-y-auto">
-          {navLinks.map((link) => {
+        {/* Nav rows — scrollable */}
+        <nav style={{ flex: 1, overflowY: 'auto' }}>
+          {MENU_SECTIONS.map((item) => {
             const currentFilter = searchParams.get('filter') || ''
-
-            let isActive
-            if (link.href === '/') {
-              isActive = pathname === '/'
-            } else if (link.href === '/shop') {
-              isActive = pathname === '/shop' && currentFilter === ''
-            } else {
-              const [, query] = link.href.split('?')
-              const filterVal = new URLSearchParams(query).get('filter')
+            let isActive = false
+            if (item.href === '/') isActive = pathname === '/'
+            else if (item.href === '/shop') isActive = pathname === '/shop' && currentFilter === ''
+            else {
+              const filterVal = new URLSearchParams(item.href.split('?')[1] || '').get('filter')
               isActive = pathname === '/shop' && currentFilter === filterVal
             }
+
             return (
               <Link
-                key={link.href}
-                href={link.href}
+                key={item.href + item.label}
+                href={item.href}
                 onClick={() => setMenuOpen(false)}
-                className="flex items-center justify-between px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200"
-                style={{
-                  color:      isActive ? THEME.accentGold : THEME.textIvory,
-                  background: isActive ? 'rgba(255,255,255,0.12)' : 'transparent',
-                }}
+                className={`kc-drawer-row${isActive ? ' active' : ''}`}
               >
-                {link.label}
-                {isActive && <FiChevronRight size={14} style={{ color: THEME.accentGold }} />}
+                <span>{item.label}</span>
+                {item.hasChevron && <FiChevronDown size={14} style={{ color: isActive ? C.purple : C.muted, transform: 'rotate(-90deg)' }} />}
               </Link>
             )
           })}
-        </nav>
 
-        {/* Drawer auth section */}
-        <div className="px-4 py-4 border-t border-white/10 space-y-1.5">
-          {user ? (
+          {/* Divider */}
+          <div style={{ height: 1, background: 'rgba(0,0,0,0.07)', margin: '4px 0' }} />
+
+          {/* Extra links */}
+          <Link href="/contact" onClick={() => setMenuOpen(false)} className="kc-drawer-row">
+            <span>Contact Us</span>
+          </Link>
+
+          {/* Auth in drawer */}
+          {user && (
             <>
-              <div className="px-4 py-2.5 rounded-xl mb-2" style={{ background: 'rgba(255,255,255,0.10)' }}>
-                <p className="text-xs font-sans" style={{ color: THEME.textMuted }}>Signed in as</p>
-                <p className="text-sm font-semibold truncate" style={{ color: THEME.textIvory }}>{user.email}</p>
-              </div>
-              {[
-                { href: '/profile',  label: 'My Profile' },
-                { href: '/orders',   label: 'My Orders'  },
-                { href: '/wishlist', label: 'Wishlist'   },
-              ].map(({ href, label }) => (
-                <Link key={href} href={href} onClick={() => setMenuOpen(false)}
-                  className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm transition-colors hover:bg-white/10"
-                  style={{ color: THEME.textIvory }}>
-                  {label}
+              <Link href="/profile" onClick={() => setMenuOpen(false)} className="kc-drawer-row">
+                <span>My Profile</span>
+                <FiChevronDown size={14} style={{ color: C.muted, transform: 'rotate(-90deg)' }} />
+              </Link>
+              <Link href="/orders" onClick={() => setMenuOpen(false)} className="kc-drawer-row">
+                <span>My Orders</span>
+                <FiChevronDown size={14} style={{ color: C.muted, transform: 'rotate(-90deg)' }} />
+              </Link>
+              {(user.role === 'admin' || user.role === 'superAdmin') && (
+                <Link href="/admin/products" onClick={() => setMenuOpen(false)} className="kc-drawer-row" style={{ color: C.purple }}>
+                  <span>Admin Panel</span>
+                  <FiChevronDown size={14} style={{ color: C.purple, transform: 'rotate(-90deg)' }} />
                 </Link>
-              ))}
-              <button onClick={handleLogout}
-                className="flex items-center gap-2 w-full px-4 py-2.5 rounded-xl text-sm transition-colors hover:bg-red-900/30"
-                style={{ color: '#FFB4C0' }}>
-                <FiLogOut size={14} /> Logout
+              )}
+              <button onClick={() => { setMenuOpen(false); handleLogout() }} className="kc-drawer-row" style={{ color: '#ef4444', borderBottom: 'none' }}>
+                <span>Log Out</span>
               </button>
             </>
-          ) : (
-            <Link href="/login" onClick={() => setMenuOpen(false)}
-              className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold transition-all hover:brightness-125"
-              style={{
-                color:      THEME.textIvory,
-                background: 'rgba(255,255,255,0.12)',
-                border:     '1px solid rgba(255,255,255,0.22)',
-              }}>
-              Login / Register
-            </Link>
           )}
-        </div>
+        </nav>
       </aside>
     </>
   )
@@ -640,7 +631,7 @@ function HeaderInner() {
 
 export default function Header() {
   return (
-    <Suspense fallback={<div className="h-14 md:h-20 w-full" aria-hidden="true" />}>
+    <Suspense fallback={<div style={{ height: 56 }} aria-hidden="true" />}>
       <HeaderInner />
     </Suspense>
   )

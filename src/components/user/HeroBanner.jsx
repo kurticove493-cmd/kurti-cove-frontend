@@ -4,47 +4,48 @@ import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 
-/*
-  Hero slider — full-slide clickable images, no CTA button overlays.
-  Slides 1–3: navigate to shop routes.
-  Slide 4: scrolls to the #deals60 section on the homepage, accounting
-           for the fixed header height so the heading is never hidden.
-*/
-
-const HEADER_H = 80   // matches md:h-20 (80px) — used for scroll offset
+const HEADER_H = 68   // matches md:h-[68px]
 
 const SLIDES = [
   {
-    src:  '/hero/image1.png',
-    alt:  'Kurti Cove Collection 1',
-    href: '/shop',
+    src:     '/hero/image1.png',
+    alt:     'Kurti Cove Collection 1',
+    href:    '/shop',
+    title:   'Utsav',
+    subtitle:'A Floral Celebration',
   },
   {
-    src:  '/hero/image2.png',
-    alt:  'Kurti Cove Collection 2',
-    href: '/shop?filter=isNewArrival',
+    src:     '/hero/image2.png',
+    alt:     'Kurti Cove Collection 2',
+    href:    '/shop?filter=isNewArrival',
+    title:   'New Arrivals',
+    subtitle:'Fresh Styles, Every Week',
   },
   {
-    src:  '/hero/image3.png',
-    alt:  'Kurti Cove Collection 3',
-    href: '/shop?filter=isBestSeller',
+    src:     '/hero/image3.png',
+    alt:     'Kurti Cove Collection 3',
+    href:    '/shop?filter=isBestSeller',
+    title:   'Best Sellers',
+    subtitle:'Loved by Thousands',
   },
   {
-    src:    '/hero/image4.png',
-    alt:    'Kurti Cove Collection 4',
-    href:   '/#deals60',     // navigates/scrolls to the 60% OFF section
-    isHash: true,            // handled with custom scroll logic
+    src:     '/hero/image4.png',
+    alt:     'Kurti Cove Collection 4',
+    href:    '/#deals60',
+    title:   'Big Sale',
+    subtitle:'Up to 60% Off',
+    isHash:  true,
   },
 ]
 
-const INTERVAL_MS = 3500
+const INTERVAL_MS = 4000
 
 export default function HeroBanner() {
   const [current, setCurrent] = useState(0)
   const intervalRef = useRef(null)
-  const router   = useRouter()
-  const pathname = usePathname()
-  const total    = SLIDES.length
+  const router      = useRouter()
+  const pathname    = usePathname()
+  const total       = SLIDES.length
 
   const startTimer = useCallback(() => {
     clearInterval(intervalRef.current)
@@ -66,12 +67,6 @@ export default function HeroBanner() {
     return () => window.removeEventListener('keydown', onKey)
   }, [goPrev, goNext])
 
-  /*
-    Handle slide 4 click: smooth-scroll to #deals60 with header offset.
-    - If already on homepage: find the element and scroll to it minus header height.
-    - If on another page: navigate to homepage, then scroll after mount.
-      We store the target in sessionStorage so the homepage can pick it up.
-  */
   const handleHashSlide = useCallback((e) => {
     e.preventDefault()
     const scrollToDeal = () => {
@@ -80,7 +75,6 @@ export default function HeroBanner() {
       const top = el.getBoundingClientRect().top + window.scrollY - HEADER_H - 16
       window.scrollTo({ top, behavior: 'smooth' })
     }
-
     if (pathname === '/') {
       scrollToDeal()
     } else {
@@ -89,10 +83,6 @@ export default function HeroBanner() {
     }
   }, [pathname, router])
 
-  /*
-    On homepage mount: check if we were sent here to scroll to deals60.
-    Uses a short delay to let the page render first.
-  */
   useEffect(() => {
     if (pathname !== '/') return
     const target = sessionStorage.getItem('kc_scroll_to')
@@ -110,26 +100,137 @@ export default function HeroBanner() {
   return (
     <>
       <style>{`
+        /* ── Marquee ── */
         @keyframes marquee {
           from { transform: translateX(0); }
           to   { transform: translateX(-50%); }
         }
-        .marquee-track { animation: marquee 30s linear infinite; }
-        .marquee-track:hover { animation-play-state: paused; }
+        .kc-marquee { animation: marquee 30s linear infinite; }
+        .kc-marquee:hover { animation-play-state: paused; }
 
-        .hero-slider-container {
+        /*
+          Hero fills the full viewport width.
+          Height = 100vw * (9/21) — Libas wide-screen ratio ~21:9.
+          On mobile switch to 4:3.
+          Min/max clamps so it never looks weird.
+        */
+        .kc-hero-wrap {
           position: relative;
           width: 100%;
           overflow: hidden;
-          aspect-ratio: 1717 / 916;
+          /* ~21:9 wide cinematic ratio */
+          aspect-ratio: 21 / 9;
+          background: #1a0a2e; /* deep purple fallback while image loads */
+        }
+        @media (max-width: 768px) {
+          .kc-hero-wrap {
+            /* 4:3 on mobile — taller so image is visible */
+            aspect-ratio: 4 / 3;
+          }
+        }
+        @media (max-width: 480px) {
+          .kc-hero-wrap { aspect-ratio: 3 / 2.8; }
         }
 
-        /*
-          Minimal edge-pinned arrow buttons — no filled disc, no border.
-          Just a clean chevron with a very subtle hover highlight.
-          Pinned flush to the left/right edge of the slider.
-        */
-        .hero-arrow {
+        /* Each slide fills the container absolutely */
+        .kc-slide {
+          position: absolute;
+          inset: 0;
+          transition: opacity 0.75s ease;
+        }
+        .kc-slide img {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
+          object-position: center top;
+          display: block;
+          user-select: none;
+          pointer-events: none;
+        }
+
+        /* Right-side dark gradient for text legibility */
+        .kc-vignette {
+          position: absolute;
+          inset: 0;
+          z-index: 2;
+          pointer-events: none;
+          background: linear-gradient(
+            to left,
+            rgba(0,0,0,0.42) 0%,
+            rgba(0,0,0,0.20) 42%,
+            transparent 66%
+          );
+        }
+        @media (max-width: 640px) {
+          .kc-vignette {
+            background: linear-gradient(
+              to top,
+              rgba(0,0,0,0.50) 0%,
+              rgba(0,0,0,0.18) 55%,
+              transparent 80%
+            );
+          }
+        }
+
+        /* Text overlay */
+        .kc-slide-text {
+          position: absolute;
+          z-index: 5;
+          right: 7%;
+          top: 50%;
+          transform: translateY(-50%);
+          text-align: center;
+          pointer-events: none;
+        }
+        @media (max-width: 640px) {
+          .kc-slide-text {
+            right: auto;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 85%;
+          }
+        }
+        .kc-slide-title {
+          font-family: "Playfair Display", Georgia, serif;
+          font-style: italic;
+          font-weight: 700;
+          color: #ffffff;
+          line-height: 1.0;
+          letter-spacing: -0.01em;
+          font-size: clamp(2.8rem, 7vw, 6.5rem);
+          text-shadow: 0 2px 24px rgba(0,0,0,0.28);
+        }
+        .kc-slide-sub {
+          font-family: Poppins, sans-serif;
+          font-weight: 400;
+          color: rgba(255,255,255,0.92);
+          letter-spacing: 0.20em;
+          text-transform: uppercase;
+          font-size: clamp(0.58rem, 1.1vw, 0.82rem);
+          margin-top: 0.5em;
+          text-shadow: 0 1px 8px rgba(0,0,0,0.35);
+        }
+        .kc-explore-btn {
+          pointer-events: auto;
+          display: inline-block;
+          margin-top: 1.5em;
+          padding: 0.55em 2em;
+          border: 1.5px solid rgba(255,255,255,0.88);
+          color: #ffffff;
+          font-family: Poppins, sans-serif;
+          font-size: clamp(0.58rem, 0.9vw, 0.74rem);
+          font-weight: 500;
+          letter-spacing: 0.16em;
+          text-transform: uppercase;
+          background: transparent;
+          cursor: pointer;
+          transition: background 0.22s;
+          text-decoration: none;
+        }
+        .kc-explore-btn:hover { background: rgba(255,255,255,0.16); }
+
+        /* Arrows */
+        .kc-arrow {
           position: absolute;
           top: 50%;
           transform: translateY(-50%);
@@ -137,156 +238,119 @@ export default function HeroBanner() {
           display: flex;
           align-items: center;
           justify-content: center;
-          cursor: pointer;
-          /* Large hit-area, visually invisible background */
-          width: 48px;
-          height: 64px;
-          border-radius: 4px;
+          width: 40px;
+          height: 56px;
           background: transparent;
           border: none;
           color: rgba(255,255,255,0.80);
-          transition: color 0.18s ease, background 0.18s ease;
+          cursor: pointer;
+          transition: color 0.18s, background 0.18s;
+          border-radius: 3px;
           padding: 0;
         }
-        .hero-arrow:hover {
-          color: #ffffff;
-          background: rgba(255,255,255,0.08);
+        .kc-arrow:hover {
+          color: #fff;
+          background: rgba(255,255,255,0.10);
         }
-        .hero-arrow svg {
-          /* Slightly thicker stroke for legibility over images */
-          filter: drop-shadow(0 1px 3px rgba(0,0,0,0.55));
-        }
-
-        @media (max-width: 767px) {
-          .hero-arrow {
-            width: 36px;
-            height: 52px;
-          }
+        .kc-arrow svg { filter: drop-shadow(0 1px 4px rgba(0,0,0,0.55)); }
+        @media (max-width: 480px) {
+          .kc-arrow { width: 28px; height: 44px; }
         }
       `}</style>
 
-      <section className="w-full relative" aria-label="Hero image slider">
-        <div className="hero-slider-container">
+      {/* ── HERO SLIDER ── */}
+      <section className="kc-hero-wrap" aria-label="Hero image slider">
 
-          {/* ── SLIDES — each is a clickable link, no CTA button overlays ── */}
-          {SLIDES.map((slide, idx) => {
-            const active = idx === current
-
-            const slideContent = (
-              <>
-                {/* Layer 1 — ambient blur fill */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={slide.src} alt="" aria-hidden="true"
-                  className="absolute inset-0 w-full h-full pointer-events-none select-none"
-                  style={{
-                    objectFit: 'cover', objectPosition: 'center',
-                    filter: 'blur(36px) brightness(0.55) saturate(1.2)',
-                    transform: 'scale(1.08)',
-                  }}
-                  draggable={false}
-                  loading={idx === 0 ? 'eager' : 'lazy'}
-                  fetchPriority={idx === 0 ? 'high' : 'auto'}
-                />
-                {/* Layer 2 — foreground, never cropped */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={slide.src} alt={slide.alt}
-                  className="absolute inset-0 w-full h-full select-none"
-                  style={{ objectFit: 'contain', objectPosition: 'center' }}
-                  draggable={false}
-                  loading={idx === 0 ? 'eager' : 'lazy'}
-                  fetchPriority={idx === 0 ? 'high' : 'auto'}
-                />
-              </>
-            )
-
-            if (slide.isHash) {
-              /* Slide 4 — custom click handler for anchor scroll */
-              return (
-                <a
-                  key={slide.src}
-                  href={slide.href}
-                  onClick={handleHashSlide}
-                  className="absolute inset-0 transition-opacity duration-700 ease-in-out block cursor-pointer"
-                  style={{ opacity: active ? 1 : 0, zIndex: active ? 1 : 0 }}
-                  aria-hidden={!active}
-                  tabIndex={active ? 0 : -1}
-                  aria-label={slide.alt}
-                >
-                  {slideContent}
-                </a>
-              )
-            }
-
-            return (
-              <Link
-                key={slide.src}
-                href={slide.href}
-                className="absolute inset-0 transition-opacity duration-700 ease-in-out block cursor-pointer"
-                style={{ opacity: active ? 1 : 0, zIndex: active ? 1 : 0 }}
-                aria-hidden={!active}
-                tabIndex={active ? 0 : -1}
-                aria-label={slide.alt}
-              >
-                {slideContent}
-              </Link>
-            )
-          })}
-
-          {/* Bottom gradient */}
-          <div className="absolute bottom-0 left-0 right-0 h-14 pointer-events-none z-10"
-               style={{ background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.12))' }} />
-
-          {/* Left arrow — minimal transparent */}
-          <button
-            onClick={(e) => { e.preventDefault(); goPrev() }}
-            aria-label="Previous slide"
-            className="hero-arrow"
-            style={{ left: 0 }}
-          >
-            <ChevronLeft size={28} strokeWidth={1.6} />
-          </button>
-
-          {/* Right arrow — minimal transparent */}
-          <button
-            onClick={(e) => { e.preventDefault(); goNext() }}
-            aria-label="Next slide"
-            className="hero-arrow"
-            style={{ right: 0 }}
-          >
-            <ChevronRight size={28} strokeWidth={1.6} />
-          </button>
-
-          {/* Dots */}
-          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-1.5 sm:gap-2"
-               role="tablist" aria-label="Slide indicators">
-            {SLIDES.map((_, idx) => (
-              <button
-                key={idx}
-                onClick={(e) => { e.preventDefault(); goTo(idx) }}
-                role="tab"
-                aria-selected={idx === current}
-                aria-label={`Go to slide ${idx + 1}`}
-                className={[
-                  'rounded-full transition-all duration-300 focus:outline-none',
-                  idx === current
-                    ? 'w-5 h-2 sm:w-7 sm:h-2.5 bg-[#E05C88] shadow-[0_0_6px_rgba(224,92,136,0.6)]'
-                    : 'w-2 h-2 sm:w-2.5 sm:h-2.5 bg-white/60 hover:bg-white',
-                ].join(' ')}
+        {SLIDES.map((slide, idx) => {
+          const active = idx === current
+          return (
+            <div
+              key={slide.src}
+              className="kc-slide"
+              style={{ opacity: active ? 1 : 0, zIndex: active ? 1 : 0 }}
+              aria-hidden={!active}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={slide.src}
+                alt={slide.alt}
+                loading={idx === 0 ? 'eager' : 'lazy'}
+                fetchPriority={idx === 0 ? 'high' : 'auto'}
               />
-            ))}
-          </div>
+
+              {/* gradient vignette */}
+              <div className="kc-vignette" />
+
+              {/* text + button */}
+              <div className="kc-slide-text">
+                <div className="kc-slide-title">{slide.title}</div>
+                <div className="kc-slide-sub">{slide.subtitle}</div>
+                {slide.isHash ? (
+                  <a href={slide.href} onClick={handleHashSlide} className="kc-explore-btn">
+                    Explore &rsaquo;
+                  </a>
+                ) : (
+                  <Link href={slide.href} className="kc-explore-btn">
+                    Explore &rsaquo;
+                  </Link>
+                )}
+              </div>
+            </div>
+          )
+        })}
+
+        {/* Bottom fade */}
+        <div style={{
+          position: 'absolute', bottom: 0, left: 0, right: 0, height: 48, zIndex: 8,
+          background: 'linear-gradient(to bottom, transparent, rgba(0,0,0,0.08))',
+          pointerEvents: 'none',
+        }} />
+
+        {/* Left arrow */}
+        <button className="kc-arrow" style={{ left: 0 }} onClick={() => goPrev()} aria-label="Previous slide">
+          <ChevronLeft size={24} strokeWidth={1.8} />
+        </button>
+
+        {/* Right arrow */}
+        <button className="kc-arrow" style={{ right: 0 }} onClick={() => goNext()} aria-label="Next slide">
+          <ChevronRight size={24} strokeWidth={1.8} />
+        </button>
+
+        {/* Dots */}
+        <div
+          style={{ position: 'absolute', bottom: 14, left: '50%', transform: 'translateX(-50%)', zIndex: 20, display: 'flex', gap: 8, alignItems: 'center' }}
+          role="tablist"
+          aria-label="Slide indicators"
+        >
+          {SLIDES.map((_, idx) => (
+            <button
+              key={idx}
+              onClick={() => goTo(idx)}
+              role="tab"
+              aria-selected={idx === current}
+              aria-label={`Go to slide ${idx + 1}`}
+              style={{
+                borderRadius: 9999,
+                border: 'none',
+                cursor: 'pointer',
+                padding: 0,
+                transition: 'all 0.3s',
+                background: idx === current ? '#ffffff' : 'rgba(255,255,255,0.45)',
+                width:  idx === current ? 22 : 8,
+                height: 8,
+                boxShadow: idx === current ? '0 0 8px rgba(255,255,255,0.6)' : 'none',
+              }}
+            />
+          ))}
         </div>
       </section>
 
-      {/* ── Marquee strip ── */}
-      <div className="w-full overflow-hidden relative"
-           style={{ background: 'linear-gradient(90deg,#E05C88 0%,#F8A5B5 50%,#E05C88 100%)' }}>
-        <div className="py-1.5 sm:py-3">
-          <div className="marquee-track flex whitespace-nowrap">
-            {[0, 1].map((repeat) => (
-              <span key={repeat} className="flex items-center flex-shrink-0">
+      {/* ── MARQUEE STRIP ── */}
+      <div style={{ width: '100%', overflow: 'hidden', background: 'linear-gradient(90deg,#6B2D8B,#9B4DB5 50%,#6B2D8B)' }}>
+        <div style={{ padding: '10px 0' }}>
+          <div className="kc-marquee" style={{ display: 'flex', whiteSpace: 'nowrap' }}>
+            {[0, 1].map(rep => (
+              <span key={rep} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                 {[
                   'Free Shipping on Orders Above ₹999',
                   'Cash on Delivery Available',
@@ -297,10 +361,9 @@ export default function HeroBanner() {
                   'New Arrivals Every Week',
                   'Secure & Encrypted Checkout',
                 ].map((text, i) => (
-                  <span key={`${repeat}-${i}`}
-                        className="inline-flex items-center gap-1.5 sm:gap-2 px-4 sm:px-8 text-[11px] sm:text-sm font-sans font-medium"
-                        style={{ color: '#FDF3F4' }}>
-                    <span style={{ color: 'rgba(253,243,244,0.50)', fontSize: '8px' }}>✦</span>
+                  <span key={`${rep}-${i}`}
+                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 28px', fontSize: '0.72rem', fontFamily: 'Poppins, sans-serif', fontWeight: 500, color: '#f3e8ff' }}>
+                    <span style={{ color: 'rgba(243,232,255,0.45)', fontSize: 7 }}>✦</span>
                     {text}
                   </span>
                 ))}

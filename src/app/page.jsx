@@ -5,13 +5,14 @@
   so the server-side fetch works on Vercel. Falls back to NEXT_PUBLIC_API_BASE_URL
   then localhost for local dev.
 */
-import HeroBanner    from '../components/user/HeroBanner'
-import NewArrivals   from '../components/user/NewArrivals'
-import FestivalSale  from '../components/user/FestivalSale'
-import BestSellers   from '../components/user/BestSellers'
-import Combos        from '../components/user/Combos'
-import OfferSection  from '../components/user/FeaturedProducts'
-import NewsletterBanner from '../components/user/NewsletterBanner'
+import HeroBanner      from '../components/user/HeroBanner'
+import CategoryGrid    from '../components/user/CategoryGrid'
+import FestiveLooks    from '../components/user/FestiveLooks'
+import CustomerReviews from '../components/user/CustomerReviews'
+import VisitOurStores  from '../components/user/VisitOurStores'
+import FestivalSale    from '../components/user/FestivalSale'
+import Combos          from '../components/user/Combos'
+import OfferSection    from '../components/user/FeaturedProducts'
 
 export const metadata = {
   title: 'Kurti Cove — Ethnic Wear for Every Woman',
@@ -52,17 +53,18 @@ export default async function HomePage() {
   return (
     <div className="bg-white">
       <HeroBanner />
+      <CategoryGrid />
+      <FestiveLooks />
+      <CustomerReviews />
+      <VisitOurStores />
       {/*
         Pass initialData only when we have real data.
         null means "please fetch yourself" — never pass empty arrays
         as that silently suppresses the client-side fetch.
       */}
-      <NewArrivals  initialData={home?.newArrivals?.length  ? home.newArrivals  : null} />
       <FestivalSale />
-      <BestSellers  initialData={home?.bestSellers?.length  ? home.bestSellers  : null} />
       <Combos       initialData={home?.combos?.length       ? home.combos       : null} />
       <OfferSection initialData={home?.deals60?.length      ? home.deals60      : null} />
-      <NewsletterBanner />
     </div>
   )
 }
