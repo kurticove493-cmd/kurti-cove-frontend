@@ -17,13 +17,19 @@ function RichTextEditor({ value, onChange }) {
   const editorRef  = useRef(null)
   const [preview,  setPreview]  = useState(false)
   const [html,     setHtml]     = useState(value || '')
-  const initiated  = useRef(false)
+  /* Track which value we last injected so we don't fight with user edits */
+  const lastInjectedRef = useRef(null)
 
-  /* Sync incoming value → editor on first mount only */
+  /* Inject value into the contenteditable whenever the PROP changes
+     (covers both first mount and switching between products in edit mode).
+     We only re-inject when the incoming value is genuinely different from
+     what we last injected — this avoids clobbering the user's cursor. */
   useEffect(() => {
-    if (initiated.current || !editorRef.current) return
+    if (!editorRef.current) return
+    if (value === lastInjectedRef.current) return   // nothing new
     editorRef.current.innerHTML = value || ''
-    initiated.current = true
+    setHtml(value || '')
+    lastInjectedRef.current = value || ''
   }, [value])
 
   const exec = useCallback((cmd, val = null) => {
@@ -270,6 +276,7 @@ export default function ProductForm({ product, onSuccess, onCancel }) {
     isFeatured:    product?.isFeatured    || false,
     isNewArrival:  product?.isNewArrival  || false,
     isBestSeller:  product?.isBestSeller  || false,
+    onSale:        product?.onSale        || false,
     colors:        product?.colors        || [],
     sizes:         product?.sizes         || [],
   })
@@ -279,6 +286,30 @@ export default function ProductForm({ product, onSuccess, onCancel }) {
   const [imagePreviews, setImagePreviews] = useState(product?.images || [])
   const [loading,       setLoading]       = useState(false)
   const fileInputRef = useRef()
+
+  /* Re-populate ALL state when switching between products (edit mode).
+     Deps on product._id so it only fires when a truly different product
+     is opened, not on every render. */
+  useEffect(() => {
+    setForm({
+      name:          product?.name          || '',
+      description:   product?.description   || '',
+      category:      product?.category      || '',
+      price:         product?.price         || '',
+      discountPrice: product?.discountPrice || '',
+      stock:         product?.stock         || '',
+      isFeatured:    product?.isFeatured    || false,
+      isNewArrival:  product?.isNewArrival  || false,
+      isBestSeller:  product?.isBestSeller  || false,
+      onSale:        product?.onSale        || false,
+      colors:        product?.colors        || [],
+      sizes:         product?.sizes         || [],
+    })
+    setImagePreviews(product?.images || [])
+    setImageFiles([])
+    setColorInput('#A855F7')
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [product?._id])
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target
@@ -333,6 +364,7 @@ export default function ProductForm({ product, onSuccess, onCancel }) {
         isFeatured:    form.isFeatured,
         isNewArrival:  form.isNewArrival,
         isBestSeller:  form.isBestSeller,
+        onSale:        form.onSale,
       }
 
       if (isEdit) {
@@ -344,13 +376,29 @@ export default function ProductForm({ product, onSuccess, onCancel }) {
         toast.success('Product created.')
       }
 
+      // Upload images AFTER product is created/updated so we have productId
       if (imageFiles.length > 0) {
         const formData = new FormData()
         imageFiles.forEach((f) => formData.append('images', f))
-        await API.post(`/product/${productId}/images`, formData, {
-          headers: { 'Content-Type': 'multipart/form-data' },
-        })
-        toast.success('Images uploaded.')
+        try {
+          const uploadRes = await API.post(`/product/${productId}/images`, formData, {
+            headers: { 'Content-Type': 'multipart/form-data' },
+          })
+          if (uploadRes.data.success) {
+            toast.success(`${imageFiles.length} image(s) uploaded to Cloudinary.`)
+          } else {
+            toast.error(`Image upload failed: ${uploadRes.data.msg || 'Unknown error'}`)
+          }
+        } catch (uploadErr) {
+          // Image upload failed — product metadata was already saved.
+          // Show a specific error so the admin knows to re-upload images.
+          const msg = uploadErr.response?.data?.msg || uploadErr.message || 'Image upload failed'
+          toast.error(`Product saved but images could not be uploaded: ${msg}`)
+          console.error('Image upload error:', msg)
+          // Do NOT call onSuccess yet — let admin see the error and retry
+          setLoading(false)
+          return
+        }
       }
 
       onSuccess()
@@ -520,6 +568,7 @@ export default function ProductForm({ product, onSuccess, onCancel }) {
             { name: 'isFeatured',   label: 'Featured'    },
             { name: 'isNewArrival', label: 'New Arrival' },
             { name: 'isBestSeller', label: 'Best Seller' },
+            { name: 'onSale',       label: 'On Sale'     },
           ].map((flag) => (
             <label key={flag.name} className="flex items-center gap-2 cursor-pointer">
               <input

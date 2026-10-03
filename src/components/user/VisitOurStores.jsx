@@ -1,35 +1,11 @@
 import Link from 'next/link'
-
-/*
-  VISIT OUR STORES — Libas-style
-  ──────────────────────────────────────────────────────────
-  Desktop : 4 columns, store photo + name + "Visit Store" link
-  Tablet  : 2 columns
-  Mobile  : 2 columns (scroll if needed)
-  Bottom  : "VIEW ALL →" centered link
-*/
+import { staticImg } from '../../lib/staticImg.js'
 
 const STORES = [
-  {
-    name:    'Karachi Center',
-    href:    '/contact',
-    image:   'https://images.unsplash.com/photo-1555529669-e69e7aa0ba9a?w=600&q=80',
-  },
-  {
-    name:    'Lahore Mall',
-    href:    '/contact',
-    image:   'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=600&q=80',
-  },
-  {
-    name:    'Islamabad Plaza',
-    href:    '/contact',
-    image:   'https://images.unsplash.com/photo-1528698827591-e19ccd7bc23d?w=600&q=80',
-  },
-  {
-    name:    'Peshawar Square',
-    href:    '/contact',
-    image:   'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?w=600&q=80',
-  },
+  { name:'Karachi Center',   href:'/contact', image: staticImg('/shops/karachi.jpg')   },
+  { name:'Lahore Mall',      href:'/contact', image: staticImg('/shops/mall.jpg')      },
+  { name:'Islamabad Plaza',  href:'/contact', image: staticImg('/shops/plaza.jpg')     },
+  { name:'Peshawar Square',  href:'/contact', image: staticImg('/shops/shopjpg.jpg')   },
 ]
 
 export default function VisitOurStores() {

@@ -6,14 +6,11 @@ const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/
 
 function SkeletonCard({ width }) {
   return (
-    <div className="rounded-2xl overflow-hidden animate-pulse border flex-shrink-0"
-         style={{ borderColor: '#F0E8EC', width }}>
-      <div className="aspect-[3/4] bg-gray-100" />
-      <div className="p-3.5 space-y-2">
-        <div className="h-4 rounded-full w-4/5 bg-gray-100" />
-        <div className="h-3 rounded-full w-1/2 bg-gray-100" />
-        <div className="h-4 rounded-full w-2/5 bg-gray-100" />
-        <div className="h-8 rounded-xl w-full bg-gray-100 mt-1" />
+    <div className="animate-pulse flex-shrink-0" style={{ width }}>
+      <div style={{ aspectRatio:'3/4', background:'#f0f0f0', borderRadius:0 }} />
+      <div style={{ paddingTop:9 }}>
+        <div style={{ height:11, background:'#ebebeb', borderRadius:2, marginBottom:6, width:'80%' }} />
+        <div style={{ height:11, background:'#ebebeb', borderRadius:2, width:'55%' }} />
       </div>
     </div>
   )
@@ -136,21 +133,27 @@ export default function SimilarProducts({ productId }) {
   if (!loading && products.length === 0) return null
 
   return (
-    <section className="mt-14 pt-10 border-t" style={{ borderColor: '#F5C8D4' }}>
-      <div className="mb-6">
-        <span className="text-xs font-bold tracking-[0.3em] uppercase font-sans block mb-2" style={{ color: '#E05C88' }}>
+    <section style={{ marginTop:64, paddingTop:40, borderTop:'1px solid #e8e8e8' }}>
+      {/* Centered heading — reference style */}
+      <div style={{ textAlign:'center', marginBottom:32 }}>
+        <span style={{
+          fontFamily:'Poppins,sans-serif', fontSize:11, fontWeight:600,
+          letterSpacing:'0.28em', textTransform:'uppercase', color:'#E05C88', display:'block', marginBottom:8,
+        }}>
           YOU MAY ALSO LIKE
         </span>
-        <h2 className="text-2xl md:text-3xl font-bold leading-tight" style={{ fontFamily: 'var(--font-playfair), serif', color: '#7B2447' }}>
+        <h2 style={{
+          fontFamily:'"Playfair Display",Georgia,serif',
+          fontSize:26, fontWeight:700, color:'#1a1a1a', margin:0,
+        }}>
           Similar Products
         </h2>
       </div>
 
       {loading ? (
-        /* Skeleton — matches the responsive card width pattern */
-        <div className="flex gap-3 overflow-x-hidden">
-          {Array.from({ length: 5 }).map((_, i) => (
-            <SkeletonCard key={i} width="calc(20% - 10px)" />
+        <div style={{ display:'flex', gap:12, overflow:'hidden' }}>
+          {Array.from({ length:5 }).map((_,i) => (
+            <div key={i} style={{ flex:'0 0 calc(20% - 10px)', aspectRatio:'3/4', background:'#f0f0f0', borderRadius:0 }} className="animate-pulse" />
           ))}
         </div>
       ) : (

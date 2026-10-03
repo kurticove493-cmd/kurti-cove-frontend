@@ -5,24 +5,25 @@ import AdminSidebar from '../../components/admin/AdminSidebar'
 export default function AdminLayout({ children }) {
   return (
     <AdminGuard>
-      {/*
-        Hide the global Header and Footer on all admin pages.
-        The global root layout renders them for every route, but admin
-        has its own sidebar navigation so the user-facing header/footer
-        are not needed here.
-      */}
       <style>{`
-        .kc-header-wrapper { display: none !important; }
-        body > div > main + footer { display: none !important; }
-        /* Also hide the header spacer div so no blank gap appears */
-        .kc-header-spacer { display: none !important; }
+        .kc-hdr    { display:none !important; }
+        .kc-spacer { display:none !important; }
+        footer     { display:none !important; }
+        /* Admin scrollbar */
+        .adm-main::-webkit-scrollbar { width:6px; }
+        .adm-main::-webkit-scrollbar-track { background:#1a1a1a; }
+        .adm-main::-webkit-scrollbar-thumb { background:#333; border-radius:3px; }
       `}</style>
 
-      <div className="min-h-screen bg-[#FAF5FF] flex">
+      <div style={{ display:'flex', minHeight:'100vh', background:'#0f0f0f' }}>
         <AdminSidebar />
-        {/* Main content — offset by sidebar width */}
-        <main className="flex-1 ml-64 min-h-screen">
-          {children}
+        <main className="adm-main" style={{
+          flex:1, marginLeft:240, minHeight:'100vh',
+          background:'#f7f7f7', overflowY:'auto',
+        }}>
+          <div style={{ maxWidth:1200, margin:'0 auto', padding:'32px 28px 56px' }}>
+            {children}
+          </div>
         </main>
       </div>
     </AdminGuard>

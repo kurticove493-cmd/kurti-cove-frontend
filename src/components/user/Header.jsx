@@ -12,11 +12,12 @@ import { AiOutlineHeart, AiFillHeart } from 'react-icons/ai'
 import { User, Settings } from 'lucide-react'
 import { resetCart } from '../../redux/features/CartSlice'
 import API from '../../utils/Helper'
+import { staticImg } from '../../lib/staticImg.js'
 
 /* ── palette ─────────────────────────────────────── */
 const C = {
-  purple:    '#6B2D8B',
-  purpleLt:  '#f3e8ff',
+  purple:    '#141414',   /* remapped to near-black for new theme */
+  purpleLt:  '#f5f5f5',
   text:      '#1a1a1a',
   muted:     'rgba(26,26,26,0.45)',
   border:    'rgba(0,0,0,0.09)',
@@ -59,7 +60,7 @@ function AvatarInitial({ name }) {
   return (
     <span
       className="w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0"
-      style={{ background: C.purple, color: '#fff' }}
+      style={{ background: '#141414', color: '#fff' }}
     >
       {initial}
     </span>
@@ -73,6 +74,7 @@ function HeaderInner() {
   const [wishlist,    setWishlist]    = useState([])
   const [searchOpen,  setSearchOpen]  = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const [scrolled,    setScrolled]    = useState(false)
 
   const cartItems = useSelector((s) => s.cart.items)
   const cartBadge = cartItems.length
@@ -80,6 +82,9 @@ function HeaderInner() {
   const pathname  = usePathname()
   const router    = useRouter()
   const searchParams = useSearchParams()
+
+  /* Header is transparent only on the home page */
+  const isHome = pathname === '/'
 
   const userMenuRef = useRef(null)
   const searchInput = useRef(null)
@@ -136,6 +141,23 @@ function HeaderInner() {
     if (searchOpen && searchInput.current) searchInput.current.focus()
   }, [searchOpen])
 
+  /* scroll — transparent → solid transition */
+  useEffect(() => {
+    let ticking = false
+    const onScroll = () => {
+      if (ticking) return
+      ticking = true
+      requestAnimationFrame(() => {
+        setScrolled(window.scrollY > 50)
+        ticking = false
+      })
+    }
+    window.addEventListener('scroll', onScroll, { passive: true })
+    // set initial state in case page loads already scrolled
+    setScrolled(window.scrollY > 50)
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
+
   /* logout */
   const handleLogout = async () => {
     try { await API.post('/user/logout') } catch {}
@@ -161,17 +183,29 @@ function HeaderInner() {
   return (
     <>
       <style>{`
-        /* ── Header always fixed, flat, white ── */
+        /* ── Header: fixed, fully transparent on top, solid when scrolled ── */
         .kc-hdr {
           position: fixed;
           top: 0; left: 0; right: 0;
           z-index: 100;
-          background: #ffffff;
-          border-bottom: 1px solid rgba(0,0,0,0.08);
           height: 56px;
+          background: transparent;
+          border-bottom: 1px solid transparent;
+          box-shadow: none;
+          transition:
+            background-color 0.25s ease,
+            border-color     0.25s ease,
+            box-shadow       0.25s ease;
         }
         @media (min-width: 768px) {
           .kc-hdr { height: 68px; }
+        }
+
+        /* ── Scrolled: solid white ── */
+        .kc-hdr-scrolled {
+          background: #ffffff;
+          border-bottom-color: rgba(0,0,0,0.08);
+          box-shadow: 0 1px 8px rgba(0,0,0,0.04);
         }
 
         /* ── Logo — Playfair italic centered ── */
@@ -189,7 +223,7 @@ function HeaderInner() {
           font-weight: 500;
           letter-spacing: 0.12em;
           text-transform: uppercase;
-          color: #1a1a1a;
+          color: #ffffff;
           display: inline-flex;
           align-items: center;
           gap: 5px;
@@ -197,11 +231,15 @@ function HeaderInner() {
           background: none;
           border: none;
           padding: 4px 2px;
-          transition: color 0.18s;
+          transition: color 0.18s, text-shadow 0.25s;
           text-decoration: none;
           white-space: nowrap;
+          text-shadow:
+            0 1px 2px rgba(0,0,0,0.70),
+            0 2px 8px rgba(0,0,0,0.45),
+            0 0px 1px rgba(0,0,0,0.90);
         }
-        .kc-txt-btn:hover { color: #6B2D8B; }
+        .kc-txt-btn:hover { color: rgba(255,255,255,0.85); }
 
         /* ── Icon buttons ── */
         .kc-icon-btn {
@@ -210,14 +248,42 @@ function HeaderInner() {
           align-items: center;
           justify-content: center;
           padding: 6px;
-          color: #1a1a1a;
+          color: #ffffff;
           border-radius: 50%;
           border: none;
           background: none;
           cursor: pointer;
-          transition: color 0.18s;
+          transition: color 0.18s, text-shadow 0.25s;
+          text-shadow:
+            0 1px 2px rgba(0,0,0,0.70),
+            0 2px 8px rgba(0,0,0,0.45),
+            0 0px 1px rgba(0,0,0,0.90);
         }
-        .kc-icon-btn:hover { color: #6B2D8B; }
+        .kc-icon-btn:hover { color: rgba(255,255,255,0.85); }
+
+        /* ── Once scrolled: revert to dark colours ── */
+        .kc-hdr-scrolled .kc-txt-btn {
+          color: #1a1a1a;
+          text-shadow: none;
+        }
+        .kc-hdr-scrolled .kc-txt-btn:hover { color: #141414; }
+        .kc-hdr-scrolled .kc-icon-btn {
+          color: #1a1a1a;
+          text-shadow: none;
+        }
+        .kc-hdr-scrolled .kc-icon-btn:hover { color: #141414; }
+
+        /* ── SVG icons need drop-shadow (text-shadow doesn't apply to SVG) ── */
+        .kc-hdr:not(.kc-hdr-scrolled) .kc-icon-btn svg,
+        .kc-hdr:not(.kc-hdr-scrolled) .kc-txt-btn svg {
+          filter:
+            drop-shadow(0 1px 2px rgba(0,0,0,0.80))
+            drop-shadow(0 2px 6px rgba(0,0,0,0.50));
+        }
+        .kc-hdr-scrolled .kc-icon-btn svg,
+        .kc-hdr-scrolled .kc-txt-btn svg {
+          filter: none;
+        }
 
         /* ── Badge ── */
         .kc-badge {
@@ -233,11 +299,11 @@ function HeaderInner() {
           justify-content: center;
           padding: 0 2px;
           line-height: 1;
-          background: #6B2D8B;
+          background: #141414;
           color: #fff;
         }
 
-        /* ── Search bar dropdown ── */
+        /* ── Search bar dropdown — always white ── */
         .kc-search-drop {
           position: fixed;
           top: 56px;
@@ -265,6 +331,7 @@ function HeaderInner() {
             border: 1px solid rgba(107,45,139,0.18);
             border-radius: 40px;
             box-shadow: 0 8px 24px rgba(107,45,139,0.12);
+            background: #ffffff;
           }
         }
 
@@ -340,11 +407,12 @@ function HeaderInner() {
           transition: background 0.15s, color 0.15s;
         }
         .kc-drawer-row:hover {
-          background: #f9f0ff;
-          color: #6B2D8B;
+          background: #f5f5f5;
+          color: #141414;
         }
         .kc-drawer-row.active {
-          color: #6B2D8B;
+          color: #141414;
+          font-weight: 700;
         }
 
         /* Spacer below header */
@@ -376,7 +444,7 @@ function HeaderInner() {
       `}</style>
 
       {/* ══════════ HEADER BAR ══════════ */}
-      <header className="kc-hdr">
+      <header className={`kc-hdr${(!isHome || scrolled) ? ' kc-hdr-scrolled' : ''}`}>
         <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 16px', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
 
           {/* ── LEFT ── */}
@@ -428,7 +496,7 @@ function HeaderInner() {
           <div className="kc-logo" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, padding: '0 12px' }}>
             <Link href="/">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo.png" alt="Kurti Cove" draggable={false} loading="eager" style={{ objectFit: 'contain' }} />
+              <img src={staticImg('/logo.png')} alt="Kurti Cove" draggable={false} loading="eager" style={{ objectFit: 'contain' }} />
             </Link>
           </div>
 
@@ -454,44 +522,50 @@ function HeaderInner() {
                 {userMenu && (
                   <div style={{
                     position: 'absolute', right: 0, top: 'calc(100% + 8px)',
-                    width: 220, background: '#fff', borderRadius: 14, overflow: 'hidden',
-                    boxShadow: '0 8px 28px rgba(107,45,139,0.14)',
-                    border: '1px solid rgba(107,45,139,0.12)', zIndex: 200,
+                    width: 230, background: '#fff', overflow: 'hidden',
+                    boxShadow: '0 4px 24px rgba(0,0,0,0.12)',
+                    border: '1px solid #e8e8e8', zIndex: 200,
+                    borderRadius: 0,
                   }}>
-                    <div style={{ padding: '12px 16px', background: '#f9f0ff', borderBottom: '1px solid rgba(107,45,139,0.10)' }}>
-                      <p style={{ fontSize: '0.7rem', color: C.purple, fontFamily: 'Poppins, sans-serif' }}>Signed in as</p>
-                      <p style={{ fontSize: '0.82rem', fontWeight: 600, color: '#3d1557', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'Poppins, sans-serif' }}>{user.email}</p>
+                    {/* Signed-in header */}
+                    <div style={{ padding: '12px 16px', background: '#f5f5f5', borderBottom: '1px solid #e8e8e8' }}>
+                      <p style={{ fontSize: '0.68rem', color: '#888', fontFamily: 'Poppins, sans-serif', letterSpacing: '0.10em', textTransform: 'uppercase', margin: '0 0 2px' }}>
+                        Signed in as
+                      </p>
+                      <p style={{ fontSize: '0.8rem', fontWeight: 600, color: '#141414', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontFamily: 'Poppins, sans-serif', margin: 0 }}>
+                        {user.email}
+                      </p>
                     </div>
                     {[
                       { href: '/profile', Icon: User,      label: 'My Profile' },
-                      { href: '/orders',  Icon: FiPackage, label: 'My Orders' },
+                      { href: '/orders',  Icon: FiPackage, label: 'My Orders'  },
                     ].map(({ href, Icon, label }) => (
                       <Link key={href} href={href} onClick={() => setUserMenu(false)}
-                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px 16px', fontSize: '0.82rem', color: '#1a1a1a', textDecoration: 'none', fontFamily: 'Poppins, sans-serif', transition: 'background 0.15s' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f9f0ff'}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '11px 16px', fontSize: '0.8rem', color: '#141414', textDecoration: 'none', fontFamily: 'Poppins, sans-serif', borderBottom: '1px solid #e8e8e8', transition: 'background 0.12s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        <span style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <Icon size={14} style={{ color: C.purple }} />{label}
+                        <span style={{ display: 'flex', alignItems: 'center', gap: 9 }}>
+                          <Icon size={13} strokeWidth={1.8} style={{ color: '#888' }} />{label}
                         </span>
-                        <FiChevronRight size={12} style={{ color: C.purple, opacity: 0.5 }} />
+                        <FiChevronRight size={11} style={{ color: '#bbb' }} />
                       </Link>
                     ))}
                     {(user.role === 'admin' || user.role === 'superAdmin') && (
                       <Link href="/admin/products" onClick={() => setUserMenu(false)}
-                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '10px 16px', fontSize: '0.82rem', color: C.purple, textDecoration: 'none', fontFamily: 'Poppins, sans-serif' }}
-                        onMouseEnter={e => e.currentTarget.style.background = '#f9f0ff'}
+                        style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '11px 16px', fontSize: '0.8rem', color: '#141414', textDecoration: 'none', fontFamily: 'Poppins, sans-serif', borderBottom: '1px solid #e8e8e8', transition: 'background 0.12s' }}
+                        onMouseEnter={e => e.currentTarget.style.background = '#f5f5f5'}
                         onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
                       >
-                        <Settings size={14} style={{ color: C.purple }} /> Admin Panel
+                        <Settings size={13} strokeWidth={1.8} style={{ color: '#888' }} /> Admin Panel
                       </Link>
                     )}
                     <button onClick={handleLogout}
-                      style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '10px 16px', fontSize: '0.82rem', color: '#ef4444', background: 'none', border: 'none', borderTop: '1px solid rgba(107,45,139,0.10)', cursor: 'pointer', fontFamily: 'Poppins, sans-serif' }}
+                      style={{ display: 'flex', alignItems: 'center', gap: 9, width: '100%', padding: '11px 16px', fontSize: '0.8rem', color: '#ef4444', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'Poppins, sans-serif', transition: 'background 0.12s' }}
                       onMouseEnter={e => e.currentTarget.style.background = '#fff5f5'}
                       onMouseLeave={e => e.currentTarget.style.background = 'none'}
                     >
-                      <FiLogOut size={13} /> Logout
+                      <FiLogOut size={13} strokeWidth={1.8} style={{ color: '#ef4444' }} /> Logout
                     </button>
                   </div>
                 )}
@@ -523,7 +597,12 @@ function HeaderInner() {
         </div>
       </header>
 
-      {/* Spacer so content doesn't hide under fixed header */}
+      {/*
+        Spacer pushes ALL page content below the fixed header.
+        HeroBanner cancels this with an equal negative margin-top
+        so it slides under the transparent header — no cropping.
+        Every other page gets natural top clearance for free.
+      */}
       <div className="kc-spacer" aria-hidden="true" />
 
       {/* ══════════ MENU OVERLAY ══════════ */}
@@ -541,7 +620,7 @@ function HeaderInner() {
           {/* Avatar / login icon */}
           <div style={{
             width: 44, height: 44, borderRadius: '50%',
-            background: C.purple,
+            background: '#141414',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
@@ -613,9 +692,9 @@ function HeaderInner() {
                 <FiChevronDown size={14} style={{ color: C.muted, transform: 'rotate(-90deg)' }} />
               </Link>
               {(user.role === 'admin' || user.role === 'superAdmin') && (
-                <Link href="/admin/products" onClick={() => setMenuOpen(false)} className="kc-drawer-row" style={{ color: C.purple }}>
+                <Link href="/admin/products" onClick={() => setMenuOpen(false)} className="kc-drawer-row" style={{ color: '#141414' }}>
                   <span>Admin Panel</span>
-                  <FiChevronDown size={14} style={{ color: C.purple, transform: 'rotate(-90deg)' }} />
+                  <FiChevronDown size={14} style={{ color: C.muted, transform: 'rotate(-90deg)' }} />
                 </Link>
               )}
               <button onClick={() => { setMenuOpen(false); handleLogout() }} className="kc-drawer-row" style={{ color: '#ef4444', borderBottom: 'none' }}>

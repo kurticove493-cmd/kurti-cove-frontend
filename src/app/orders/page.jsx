@@ -5,146 +5,214 @@ import API from '../../utils/Helper'
 import toast from 'react-hot-toast'
 import { Package, ChevronRight } from 'lucide-react'
 
-/* ── Palette ── */
-const ROSE     = '#E05C88'
-const BERRY    = '#7B2447'
-const MAUVE    = '#6B4553'
-const PINK     = '#F8A5B5'
-const BORDER   = '#F5C8D4'
-const PEACH_LT = '#FEF0E3'
+const INK  = '#141414'
+const MUTE = '#888'
+const RULE = '#e8e8e8'
+const ROSE = '#E05C88'
+const WHT  = '#ffffff'
 
-const ACCT_SERIF = '"Cormorant Garamond", "Playfair Display", Georgia, serif'
-
-const STATUS_STYLES = {
-  placed:           { bg: '#FEF9C3', text: '#92400e', border: '#FDE68A' },
-  confirmed:        { bg: '#DBEAFE', text: '#1e40af', border: '#BFDBFE' },
-  shipped:          { bg: '#E0E7FF', text: '#3730a3', border: '#C7D2FE' },
-  out_for_delivery: { bg: '#FFEDD5', text: '#9a3412', border: '#FED7AA' },
-  delivered:        { bg: '#DCFCE7', text: '#166534', border: '#BBF7D0' },
-  cancelled:        { bg: '#FEE2E2', text: '#991b1b', border: '#FECACA' },
+const ORDER_STATUS = {
+  placed:           { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  confirmed:        { bg:'#dbeafe', text:'#1e40af', border:'#bfdbfe' },
+  shipped:          { bg:'#e0e7ff', text:'#3730a3', border:'#c7d2fe' },
+  out_for_delivery: { bg:'#ffedd5', text:'#9a3412', border:'#fed7aa' },
+  delivered:        { bg:'#dcfce7', text:'#166534', border:'#bbf7d0' },
+  cancelled:        { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
 }
-const PAY_STATUS_STYLES = {
-  paid:    { bg: '#DCFCE7', text: '#166534', border: '#BBF7D0' },
-  failed:  { bg: '#FEE2E2', text: '#991b1b', border: '#FECACA' },
-  pending: { bg: '#FEF9C3', text: '#92400e', border: '#FDE68A' },
+const PAY_STATUS = {
+  paid:    { bg:'#dcfce7', text:'#166534', border:'#bbf7d0' },
+  failed:  { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
+  pending: { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  pending_verification: { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
 }
 
-function StatusBadge({ status, map }) {
-  const s = map[status] || { bg: '#F3F4F6', text: '#6B7280', border: '#E5E7EB' }
+function Badge({ status, map }) {
+  const s = map[status] || { bg:'#f3f4f6', text:'#6b7280', border:'#e5e7eb' }
   return (
-    <span className="px-3 py-1 rounded-full text-xs font-semibold border font-sans"
-          style={{ background: s.bg, color: s.text, borderColor: s.border }}>
-      {status.replace('_', ' ').toUpperCase()}
+    <span style={{
+      display:'inline-block', padding:'3px 10px',
+      fontFamily:'Poppins,sans-serif', fontSize:10, fontWeight:600,
+      letterSpacing:'0.08em', textTransform:'uppercase',
+      background:s.bg, color:s.text, border:`1px solid ${s.border}`,
+    }}>
+      {status.replace(/_/g,' ')}
     </span>
   )
 }
 
-const formatDate = (d) =>
-  new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' })
+const fmtDate = d => new Date(d).toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
+
+const PAGE_CSS = `
+  .ord { background:#fafafa; min-height:100vh; }
+  .ord *, .ord *::before, .ord *::after { box-sizing:border-box; }
+  .ord-card {
+    background:#fff; border:1px solid ${RULE};
+    padding:20px; margin-bottom:12px;
+    transition:border-color 0.15s;
+  }
+  .ord-card:hover { border-color:#bbb; }
+`
 
 export default function OrdersPage() {
   const [orders,  setOrders]  = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const fetchOrders = async () => {
-      try {
-        const res = await API.get('/order/my-orders')
-        if (res.data.success) setOrders(res.data.data)
-      } catch { toast.error('Failed to load orders.') }
-      finally { setLoading(false) }
-    }
-    fetchOrders()
+    API.get('/order/my-orders')
+      .then(res => { if (res.data.success) setOrders(res.data.data) })
+      .catch(() => toast.error('Failed to load orders.'))
+      .finally(() => setLoading(false))
   }, [])
 
   const handleCancel = async (orderId) => {
-    if (!confirm('Are you sure you want to cancel this order?')) return
+    if (!confirm('Cancel this order?')) return
     try {
       await API.patch(`/order/cancel/${orderId}`)
-      setOrders(prev => prev.map(o => o._id === orderId ? { ...o, orderStatus: 'cancelled' } : o))
+      setOrders(prev => prev.map(o => o._id === orderId ? { ...o, orderStatus:'cancelled' } : o))
       toast.success('Order cancelled.')
     } catch (err) { toast.error(err.response?.data?.msg || 'Cannot cancel this order.') }
   }
 
   return (
-    <main className="min-h-screen py-10 bg-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
-        <h1 className="font-bold text-4xl mb-8" style={{ fontFamily: ACCT_SERIF, color: BERRY }}>
-          My Orders
-        </h1>
+    <>
+      <style>{PAGE_CSS}</style>
+      <main className="ord">
+        <div style={{ maxWidth:800, margin:'0 auto', padding:'32px 16px 64px' }}>
 
-        {loading ? (
-          <div className="flex justify-center py-16">
-            <div className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin"
-                 style={{ borderColor: ROSE, borderTopColor: 'transparent' }} />
+          {/* Breadcrumb */}
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:24,
+            fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE }}>
+            <Link href="/profile" style={{ color:MUTE, textDecoration:'none' }}>Account</Link>
+            <span>/</span>
+            <span style={{ color:INK }}>My Orders</span>
           </div>
-        ) : orders.length === 0 ? (
-          <div className="bg-white rounded-[16px] p-16 text-center shadow-card"
-               style={{ border: `1px solid ${BORDER}` }}>
-            <Package size={52} className="mx-auto mb-4" style={{ color: BORDER }} />
-            <h2 className="text-2xl font-bold mb-2" style={{ fontFamily: ACCT_SERIF, color: BERRY }}>No orders yet</h2>
-            <p className="font-sans text-sm mb-8" style={{ color: MAUVE }}>Start shopping and your orders will appear here</p>
-            <Link href="/shop" className="inline-flex items-center gap-2 text-white px-8 py-3 rounded-full font-sans font-semibold text-sm transition-all hover:shadow-lg"
-                  style={{ background: ROSE }}>Shop Now →</Link>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {orders.map((order) => (
-              <div key={order._id} className="bg-white rounded-[16px] p-5 shadow-card hover:shadow-card-hover transition-shadow"
-                   style={{ border: `1px solid ${BORDER}` }}>
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-                  <div>
-                    <p className="font-mono text-xs" style={{ color: PINK }}>Order #{order._id.slice(-10).toUpperCase()}</p>
-                    <p className="font-sans text-xs mt-0.5" style={{ color: MAUVE }}>{formatDate(order.createdAt)}</p>
+
+          <h1 style={{ fontFamily:'"Playfair Display",Georgia,serif', fontSize:28,
+            fontWeight:700, color:INK, marginBottom:28 }}>
+            My Orders
+          </h1>
+
+          {loading ? (
+            <div style={{ display:'flex', justifyContent:'center', padding:'64px 0' }}>
+              <div style={{ width:28, height:28, borderRadius:'50%',
+                border:`2.5px solid ${INK}`, borderTopColor:'transparent',
+                animation:'spin .7s linear infinite' }} />
+              <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+            </div>
+          ) : orders.length === 0 ? (
+            <div style={{ background:WHT, border:`1px solid ${RULE}`, padding:'64px 24px', textAlign:'center' }}>
+              <Package size={44} color={RULE} style={{ margin:'0 auto 16px' }} />
+              <h2 style={{ fontFamily:'"Playfair Display",Georgia,serif', fontSize:22,
+                fontWeight:700, color:INK, marginBottom:8 }}>
+                No orders yet
+              </h2>
+              <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13, color:MUTE, marginBottom:24 }}>
+                Your orders will appear here once you shop
+              </p>
+              <Link href="/shop" style={{
+                display:'inline-block', padding:'11px 32px',
+                background:INK, color:WHT, textDecoration:'none',
+                fontFamily:'Poppins,sans-serif', fontSize:11, fontWeight:600,
+                letterSpacing:'0.14em', textTransform:'uppercase',
+              }}>
+                Shop Now
+              </Link>
+            </div>
+          ) : (
+            <div>
+              {orders.map(order => (
+                <div key={order._id} className="ord-card">
+
+                  {/* Top row: ID + date + status */}
+                  <div style={{ display:'flex', alignItems:'flex-start',
+                    justifyContent:'space-between', gap:12, marginBottom:16, flexWrap:'wrap' }}>
+                    <div>
+                      <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11,
+                        fontWeight:600, color:MUTE, letterSpacing:'0.08em',
+                        textTransform:'uppercase', margin:'0 0 3px' }}>
+                        Order #{order._id.slice(-10).toUpperCase()}
+                      </p>
+                      <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11,
+                        color:MUTE, margin:0 }}>
+                        {fmtDate(order.createdAt)}
+                      </p>
+                    </div>
+                    <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                      <Badge status={order.orderStatus} map={ORDER_STATUS} />
+                      {order.orderStatus === 'placed' && (
+                        <button onClick={() => handleCancel(order._id)} style={{
+                          fontFamily:'Poppins,sans-serif', fontSize:10, fontWeight:600,
+                          letterSpacing:'0.08em', textTransform:'uppercase',
+                          color:'#ef4444', background:'none',
+                          border:'1px solid #fecaca', padding:'3px 10px', cursor:'pointer',
+                          transition:'border-color 0.15s',
+                        }}>
+                          Cancel
+                        </button>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-3 flex-wrap">
-                    <StatusBadge status={order.orderStatus} map={STATUS_STYLES} />
-                    {order.orderStatus === 'placed' && (
-                      <button onClick={() => handleCancel(order._id)}
-                        className="text-xs text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-3 py-1 rounded-full font-medium font-sans transition-all">
-                        Cancel
-                      </button>
+
+                  {/* Product thumbnails */}
+                  <div style={{ display:'flex', gap:8, marginBottom:16, overflowX:'auto',
+                    paddingBottom:4, scrollbarWidth:'none' }}>
+                    {order.items.slice(0,5).map((item, i) => (
+                      <div key={i} style={{ flexShrink:0, width:52, height:60,
+                        background:'#f5f5f5', overflow:'hidden' }}>
+                        {item.image
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={item.image} alt={item.name}
+                              style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+                          : <div style={{ width:'100%', height:'100%', display:'flex',
+                              alignItems:'center', justifyContent:'center', fontSize:22 }}>👗</div>}
+                      </div>
+                    ))}
+                    {order.items.length > 5 && (
+                      <div style={{ flexShrink:0, width:52, height:60, background:'#f5f5f5',
+                        display:'flex', alignItems:'center', justifyContent:'center' }}>
+                        <span style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE }}>
+                          +{order.items.length - 5}
+                        </span>
+                      </div>
                     )}
                   </div>
-                </div>
-                <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-                  {order.items.slice(0, 4).map((item, i) => (
-                    <div key={i} className="flex-shrink-0 w-14 h-16 rounded-lg overflow-hidden" style={{ background: PEACH_LT }}>
-                      {item.image
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center text-xl">👗</div>}
+
+                  {/* Bottom row: amount + payment + link */}
+                  <div style={{ display:'flex', alignItems:'center',
+                    justifyContent:'space-between', flexWrap:'wrap', gap:10 }}>
+                    <div>
+                      <p style={{ fontFamily:'"Playfair Display",Georgia,serif', fontSize:18,
+                        fontWeight:700, color:INK, margin:'0 0 6px' }}>
+                        ₹{order.totalAmount.toLocaleString()}
+                      </p>
+                      <div style={{ display:'flex', alignItems:'center', gap:8, flexWrap:'wrap' }}>
+                        <span style={{ fontFamily:'Poppins,sans-serif', fontSize:10,
+                          color:MUTE, letterSpacing:'0.06em', textTransform:'uppercase' }}>
+                          {(order.paymentMethod||'upi').toUpperCase()}
+                        </span>
+                        <Badge status={order.paymentStatus||'pending'} map={PAY_STATUS} />
+                        <span style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE }}>
+                          · {order.items.length} item{order.items.length !== 1 ? 's' : ''}
+                        </span>
+                      </div>
                     </div>
-                  ))}
-                  {order.items.length > 4 && (
-                    <div className="flex-shrink-0 w-14 h-16 rounded-lg flex items-center justify-center" style={{ background: PEACH_LT }}>
-                      <span className="text-xs font-medium" style={{ color: PINK }}>+{order.items.length - 4}</span>
-                    </div>
-                  )}
-                </div>
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div>
-                    <p className="font-sans text-xs" style={{ color: PINK }}>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
-                    <p className="font-bold text-base" style={{ fontFamily: ACCT_SERIF, color: BERRY }}>₹{order.totalAmount.toLocaleString()}</p>
-                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                      <span className="px-2 py-0.5 rounded-full text-[10px] font-semibold border font-sans"
-                            style={{ background: PEACH_LT, color: BERRY, borderColor: BORDER }}>
-                        {(order.paymentMethod || 'cod').toUpperCase()}
-                      </span>
-                      <StatusBadge status={order.paymentStatus || 'pending'} map={PAY_STATUS_STYLES} />
-                    </div>
+                    <Link href={`/orders/${order._id}`} style={{
+                      display:'inline-flex', alignItems:'center', gap:4,
+                      fontFamily:'Poppins,sans-serif', fontSize:12, fontWeight:500,
+                      color:INK, textDecoration:'none', textTransform:'uppercase',
+                      letterSpacing:'0.08em', borderBottom:`1px solid ${INK}`,
+                      paddingBottom:1,
+                    }}>
+                      View Details <ChevronRight size={13} strokeWidth={2} />
+                    </Link>
                   </div>
-                  <Link href={`/orders/${order._id}`}
-                    className="flex items-center gap-1 text-sm font-medium font-sans transition-colors"
-                    style={{ color: ROSE }}>
-                    View Details <ChevronRight size={15} />
-                  </Link>
+
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </main>
+              ))}
+            </div>
+          )}
+        </div>
+      </main>
+    </>
   )
 }

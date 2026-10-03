@@ -1,148 +1,190 @@
 'use client'
 import Link from 'next/link'
 import { AiFillHeart, AiOutlineHeart } from 'react-icons/ai'
+import { Star } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
-
-/* ─── Palette ─── */
-const ROSE   = '#E05C88'
-const BERRY  = '#7B2447'
-const MAUVE  = '#6B4553'
-const BORDER = '#F0E8EC'
+import { cldUrl, normalizeProductImages } from '../../lib/cloudinaryImage.js'
 
 const WL_KEY = 'kc_wishlist'
-const getWishlist = () => { try { return JSON.parse(localStorage.getItem(WL_KEY) || '[]') } catch { return [] } }
+const getWL  = () => { try { return JSON.parse(localStorage.getItem(WL_KEY) || '[]') } catch { return [] } }
 
-/*
-  Cloudinary URL transformer — adds auto quality, auto format, and
-  width transformation so the browser receives an appropriately-sized
-  WebP/AVIF rather than the raw upload.
+export default function ProductCard({ product, priority = false, showNewTag = false }) {
+  const [inWL, setInWL] = useState(false)
 
-  If the URL is not a Cloudinary URL (e.g. placeholder), returns it unchanged.
-  w=400 matches the typical 2-column card width on mobile/desktop grids.
-*/
-function cdnImg(url, w = 400) {
-  if (!url) return url
-  if (!url.includes('res.cloudinary.com')) return url
-  // Insert transformation after /upload/ or /image/upload/
-  return url.replace(/\/upload\//, `/upload/w_${w},q_auto:good,f_auto,dpr_auto/`)
-}
+  useEffect(() => { setInWL(getWL().includes(product._id)) }, [product._id])
 
-export default function ProductCard({ product, priority = false }) {
-  const [inWishlist, setInWishlist] = useState(false)
-
-  useEffect(() => {
-    setInWishlist(getWishlist().includes(product._id))
-  }, [product._id])
-
-  const toggleWishlist = useCallback((e) => {
-    e.preventDefault()
-    e.stopPropagation()
-    const wl   = getWishlist()
-    const next = wl.includes(product._id)
-      ? wl.filter((id) => id !== product._id)
-      : [...wl, product._id]
+  const toggleWL = useCallback((e) => {
+    e.preventDefault(); e.stopPropagation()
+    const wl   = getWL()
+    const next = wl.includes(product._id) ? wl.filter(x => x !== product._id) : [...wl, product._id]
     localStorage.setItem(WL_KEY, JSON.stringify(next))
-    setInWishlist(!inWishlist)
-    /* Notify header + other tabs immediately */
+    setInWL(!inWL)
     window.dispatchEvent(new Event('kc-wishlist-changed'))
-  }, [product._id, inWishlist])
+  }, [product._id, inWL])
 
-  const displayPrice = product.discountPrice || product.price
-  const hasDiscount  = product.discountPrice && product.discountPrice < product.price
-  const imgSrc       = cdnImg(product.images?.[0])
+  const cur    = product.discountPrice || product.price
+  const hasDis = product.discountPrice && product.discountPrice < product.price
+  const pct    = hasDis ? Math.round((1 - product.discountPrice / product.price) * 100) : 0
+  const avgR   = product.avgRating   || product.rating    || 0
+  const revCnt = product.reviewCount || product.numReviews || 0
+  const showR  = avgR > 0 && revCnt > 0
+  const sizes  = (Array.isArray(product.sizes) && product.sizes.length ? product.sizes
+                 : Array.isArray(product.size)  && product.size.length  ? product.size : [])
+
+  /* Normalize images — handles plain strings, objects, JSON strings safely */
+  const normalizedImgs = normalizeProductImages(product.images, product.name)
+  const rawSrc = normalizedImgs.length > 0 ? normalizedImgs[0].src : ''
+  const imgSrc = rawSrc ? cldUrl(rawSrc, { width: 480 }) : ''
 
   return (
-    <Link href={`/product/${product._id}`} className="group block h-full">
-      <div
-        className="bg-white rounded-2xl overflow-hidden flex flex-col h-full transition-all duration-300 hover:-translate-y-1"
-        style={{ border: `1px solid ${BORDER}`, boxShadow: '0 1px 6px rgba(224,92,136,0.07)' }}
-        onMouseEnter={(e) => { e.currentTarget.style.boxShadow = '0 8px 28px rgba(224,92,136,0.16)' }}
-        onMouseLeave={(e) => { e.currentTarget.style.boxShadow = '0 1px 6px rgba(224,92,136,0.07)' }}
-      >
-        {/* ── IMAGE ── */}
-        <div className="relative aspect-[3/4] bg-[#fafafa] overflow-hidden">
+    <>
+      <style>{`
+        .pc { background:#fff; cursor:pointer; display:block; }
+        .pc:hover .pc-img { transform:scale(1.04); }
+        .pc-img {
+          width:100%; height:100%; object-fit:cover;
+          transition:transform 0.5s ease; display:block;
+        }
+        /* Fixed aspect-ratio wrapper — prevents blank vertical space on broken/missing images */
+        .pc-img-wrap {
+          position:relative; overflow:hidden;
+          aspect-ratio:3/4; background:#f5f5f5;
+        }
+        .pc-heart {
+          position:absolute; bottom:9px; right:9px; z-index:10;
+          width:28px; height:28px;
+          background:rgba(255,255,255,0.88);
+          border-radius:50%; border:1px solid rgba(0,0,0,0.08);
+          display:flex; align-items:center; justify-content:center;
+          cursor:pointer; transition:background 0.18s,transform 0.18s;
+          backdrop-filter:blur(4px);
+        }
+        .pc-heart:hover { background:#fff; transform:scale(1.12); }
+        .pc-pill {
+          position:absolute; bottom:9px; left:9px; z-index:10;
+          display:inline-flex; align-items:center; gap:3px;
+          background:rgba(255,255,255,0.90); backdrop-filter:blur(4px);
+          border-radius:20px; padding:2px 7px; font-size:10px;
+          font-family:Poppins,sans-serif; font-weight:600; color:#141414;
+          border:1px solid rgba(0,0,0,0.07); line-height:1.4;
+        }
+        .pc-new {
+          position:absolute; top:8px; left:8px; z-index:10;
+          background:#141414; color:#fff;
+          font-family:Poppins,sans-serif; font-size:9px; font-weight:600;
+          letter-spacing:0.12em; padding:3px 8px; text-transform:uppercase;
+        }
+        .pc-oos {
+          position:absolute; inset:0; background:rgba(255,255,255,0.55);
+          display:flex; align-items:center; justify-content:center;
+        }
+        .pc-oos span {
+          background:#fff; font-size:10px; font-family:Poppins,sans-serif;
+          font-weight:600; padding:3px 10px; color:#141414; letter-spacing:0.06em;
+        }
+        .pc-no-img {
+          position:absolute; inset:0;
+          display:flex; align-items:center; justify-content:center;
+          font-size:40px; color:#ccc; background:#f5f5f5;
+        }
+      `}</style>
+
+      <Link href={`/product/${product._id}`} className="pc">
+
+        {/* IMAGE — aspect-ratio container prevents blank space when image missing */}
+        <div className="pc-img-wrap">
           {imgSrc ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
               src={imgSrc}
               alt={product.name}
-              /*
-                Below-fold cards use lazy loading + async decoding.
-                The first card in a hero/above-fold position can pass
-                priority=true to get eager + fetchpriority=high.
-              */
               loading={priority ? 'eager' : 'lazy'}
               decoding={priority ? 'sync' : 'async'}
               fetchPriority={priority ? 'high' : 'low'}
-              className="w-full h-full object-contain transition-transform duration-500 group-hover:scale-[1.04]"
-              width={400}
-              height={533}
+              className="pc-img"
+              width={480}
+              height={640}
+              onError={e => {
+                /* Try raw URL without Cloudinary transforms once */
+                if (!e.currentTarget.dataset.triedRaw && rawSrc && rawSrc !== imgSrc) {
+                  e.currentTarget.dataset.triedRaw = '1'
+                  e.currentTarget.src = rawSrc
+                } else {
+                  /* Final fallback: hide broken img, show emoji placeholder */
+                  e.currentTarget.style.display = 'none'
+                  const wrap = e.currentTarget.closest('.pc-img-wrap')
+                  if (wrap && !wrap.querySelector('.pc-no-img')) {
+                    const d = document.createElement('div')
+                    d.className = 'pc-no-img'
+                    d.textContent = '👗'
+                    wrap.appendChild(d)
+                  }
+                }
+              }}
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-4xl">👗</div>
+            <div className="pc-no-img">👗</div>
           )}
 
-          {/* Out of stock — no marketing badges */}
           {product.stock === 0 && (
-            <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
-              <span className="bg-white text-xs font-semibold px-3 py-1 rounded-full shadow" style={{ color: BERRY }}>
-                Out of Stock
-              </span>
+            <div className="pc-oos"><span>OUT OF STOCK</span></div>
+          )}
+          {showNewTag && product.isNewArrival && (
+            <div className="pc-new">New</div>
+          )}
+          {showR && (
+            <div className="pc-pill">
+              <Star size={9} fill="#E05C88" color="#E05C88" />
+              {avgR.toFixed(1)}
+              <span style={{ color:'#888', fontWeight:400 }}>({revCnt})</span>
             </div>
           )}
-
-          {/* Wishlist heart */}
           <button
-            onClick={toggleWishlist}
-            aria-label={inWishlist ? 'Remove from wishlist' : 'Add to wishlist'}
-            className="absolute top-2.5 right-2.5 z-10 w-8 h-8 md:w-9 md:h-9 rounded-full bg-white/90 shadow flex items-center justify-center transition-all duration-200 hover:scale-110"
+            onClick={toggleWL}
+            aria-label={inWL ? 'Remove from wishlist' : 'Add to wishlist'}
+            className="pc-heart"
           >
-            {inWishlist
-              ? <AiFillHeart size={15} className="text-red-500" />
-              : <AiOutlineHeart size={15} style={{ color: MAUVE }} />}
+            {inWL
+              ? <AiFillHeart size={13} color="#E05C88" />
+              : <AiOutlineHeart size={13} color="#555" />}
           </button>
         </div>
 
-        {/* ── DETAILS ── */}
-        <div className="p-2.5 md:p-3.5 flex flex-col gap-1 flex-1">
-
-          {/* Product name */}
-          <h3 className="font-sans font-bold text-[12px] md:text-sm leading-snug line-clamp-1" style={{ color: BERRY }}>
+        {/* TEXT */}
+        <div style={{ paddingTop:9, paddingBottom:4 }}>
+          <p style={{
+            fontFamily:'Poppins,sans-serif', fontSize:12, fontWeight:400,
+            color:'#1a1a1a', lineHeight:1.4, marginBottom:5,
+            overflow:'hidden', display:'-webkit-box',
+            WebkitLineClamp:1, WebkitBoxOrient:'vertical',
+          }}>
             {product.name}
-          </h3>
+          </p>
 
-          {/* Category */}
-          {product.category && (
-            <p className="font-sans text-[10px] md:text-[11px] line-clamp-1 leading-none" style={{ color: MAUVE }}>
-              {product.category}
-            </p>
-          )}
-
-          <div className="flex-1 min-h-[4px]" />
-
-          {/* Price */}
-          <div className="flex items-baseline gap-1.5 flex-wrap">
-            <span className="font-sans font-bold text-sm md:text-[15px] leading-none" style={{ color: ROSE }}>
-              ₹{displayPrice.toLocaleString()}
-            </span>
-            {hasDiscount && (
-              <span className="font-sans text-[10px] md:text-xs line-through leading-none" style={{ color: '#9CA3AF' }}>
+          <div style={{ display:'flex', alignItems:'baseline', gap:5, flexWrap:'wrap', marginBottom:5 }}>
+            {hasDis && (
+              <span style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:'#aaa', textDecoration:'line-through', fontWeight:400 }}>
                 ₹{product.price.toLocaleString()}
+              </span>
+            )}
+            <span style={{ fontFamily:'Poppins,sans-serif', fontSize:13, fontWeight:600, color:'#1a1a1a' }}>
+              ₹{cur.toLocaleString()}
+            </span>
+            {pct > 0 && (
+              <span style={{ fontFamily:'Poppins,sans-serif', fontSize:11, fontWeight:500, color:'#E05C88' }}>
+                {pct}% off
               </span>
             )}
           </div>
 
-          {/* CTA — navigates to PDP, does NOT add to cart directly */}
-          <Link
-            href={`/product/${product._id}`}
-            onClick={(e) => e.stopPropagation()}
-            className="mt-2 w-full flex items-center justify-center text-white font-sans font-medium text-[11px] md:text-xs py-2 md:py-2.5 rounded-xl transition-all duration-200 hover:opacity-90 active:scale-[0.98]"
-            style={{ background: ROSE }}
-          >
-            Buy Now
-          </Link>
+          {sizes.length > 0 && (
+            <p style={{ fontFamily:'Poppins,sans-serif', fontSize:10, letterSpacing:'0.10em', color:'#888', fontWeight:400, textTransform:'uppercase' }}>
+              {sizes.join('  ')}
+            </p>
+          )}
         </div>
-      </div>
-    </Link>
+
+      </Link>
+    </>
   )
 }

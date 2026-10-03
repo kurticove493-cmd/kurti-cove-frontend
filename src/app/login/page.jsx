@@ -8,50 +8,43 @@ import { syncAndLoadCart } from '../../utils/cartHelper'
 import toast from 'react-hot-toast'
 import { AlertCircle, Eye, EyeOff } from 'lucide-react'
 
-/* ── Palette ── */
+/* ── New minimal theme ── */
+const INK    = '#141414'
+const MUTE   = '#888'
+const RULE   = '#e8e8e8'
+const PLUM   = '#7B1153'
 const ROSE   = '#E05C88'
-const BERRY  = '#7B2447'
-const MAUVE  = '#6B4553'
-const PINK   = '#F8A5B5'
-const CREAM  = '#FCFAE0'
-const BORDER = '#F5C8D4'
-const CARD   = '#FFFAF5'
+const WHT    = '#ffffff'
 
-/* ── Input with optional eye toggle for password fields ── */
 function InputField({ label, type: initialType = 'text', name, value, onChange, placeholder, required, autoComplete }) {
-  const [showPwd, setShowPwd] = useState(false)
-  const isPassword = initialType === 'password'
-  const fieldType  = isPassword ? (showPwd ? 'text' : 'password') : initialType
+  const [show, setShow] = useState(false)
+  const isPwd  = initialType === 'password'
+  const fType  = isPwd ? (show ? 'text' : 'password') : initialType
 
   return (
     <div>
-      <label className="block text-xs font-semibold mb-1.5 font-sans tracking-wide uppercase"
-             style={{ color: BERRY }}>
+      <label style={{ display:'block', fontFamily:'Poppins,sans-serif', fontSize:11,
+        fontWeight:600, letterSpacing:'0.12em', textTransform:'uppercase', color:MUTE, marginBottom:6 }}>
         {label}
       </label>
-      <div className="relative">
-        <input
-          type={fieldType} name={name} value={value} onChange={onChange}
+      <div style={{ position:'relative' }}>
+        <input type={fType} name={name} value={value} onChange={onChange}
           placeholder={placeholder} required={required} autoComplete={autoComplete}
-          className="w-full border rounded-xl px-4 py-3 text-sm font-sans outline-none transition-all"
           style={{
-            borderColor: BORDER,
-            color:       BERRY,
-            background:  CARD,
-            paddingRight: isPassword ? '2.75rem' : '1rem',
+            width:'100%', padding: isPwd ? '11px 42px 11px 14px' : '11px 14px',
+            fontFamily:'Poppins,sans-serif', fontSize:13, color:INK,
+            border:`1px solid ${RULE}`, background:WHT,
+            outline:'none', borderRadius:0, boxSizing:'border-box',
           }}
-          onFocus={(e) => { e.target.style.borderColor = ROSE; e.target.style.boxShadow = `0 0 0 3px ${ROSE}1A` }}
-          onBlur={(e)  => { e.target.style.borderColor = BORDER; e.target.style.boxShadow = 'none' }}
+          onFocus={e => e.target.style.borderColor = INK}
+          onBlur={e  => e.target.style.borderColor = RULE}
         />
-        {isPassword && (
-          <button
-            type="button"
-            aria-label={showPwd ? 'Hide password' : 'Show password'}
-            onClick={() => setShowPwd(v => !v)}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-0.5 rounded transition-colors"
-            style={{ color: showPwd ? ROSE : PINK }}
-          >
-            {showPwd ? <EyeOff size={16} strokeWidth={1.8} /> : <Eye size={16} strokeWidth={1.8} />}
+        {isPwd && (
+          <button type="button" onClick={() => setShow(v=>!v)}
+            style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)',
+              background:'none', border:'none', cursor:'pointer', color: show ? INK : MUTE,
+              display:'flex', padding:0 }}>
+            {show ? <EyeOff size={15} strokeWidth={1.8} /> : <Eye size={15} strokeWidth={1.8} />}
           </button>
         )}
       </div>
@@ -66,9 +59,9 @@ function LoginForm() {
 
   const [form,    setForm]    = useState({ email: '', password: '' })
   const [loading, setLoading] = useState(false)
-
   const errorParam = searchParams.get('error')
-  const handleChange = (e) => setForm((p) => ({ ...p, [e.target.name]: e.target.value }))
+
+  const handleChange = e => setForm(p => ({ ...p, [e.target.name]: e.target.value }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -80,7 +73,7 @@ function LoginForm() {
         const { token, user } = res.data.data
         localStorage.setItem('kc_token', token)
         localStorage.setItem('kc_user', JSON.stringify(user))
-        document.cookie = `auth_token=${token}; path=/; max-age=${30 * 24 * 3600}`
+        document.cookie = `auth_token=${token}; path=/; max-age=${30*24*3600}`
         window.dispatchEvent(new Event('kc-auth-changed'))
         await syncAndLoadCart(dispatch)
         toast.success(`Welcome back, ${user.name.split(' ')[0]}!`)
@@ -88,77 +81,78 @@ function LoginForm() {
       }
     } catch (err) {
       toast.error(err.response?.data?.msg || 'Login failed.')
-    } finally {
-      setLoading(false)
-    }
+    } finally { setLoading(false) }
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center py-12 px-4"
-          style={{ background: `linear-gradient(160deg, ${CREAM} 0%, #fffaf5 100%)` }}>
-      <div className="w-full max-w-md">
+    <main style={{ minHeight:'100vh', display:'flex', alignItems:'center',
+      justifyContent:'center', background:'#fafafa', padding:'48px 16px' }}>
+      <div style={{ width:'100%', maxWidth:400 }}>
 
-        <div className="bg-white rounded-2xl px-8 py-10"
-             style={{ border: `1.5px solid ${BORDER}`, boxShadow: `0 8px 40px rgba(224,92,136,0.10)` }}>
+        {/* Logo */}
+        <div style={{ textAlign:'center', marginBottom:32 }}>
+          <Link href="/">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Kurti Cove" style={{ height:42, objectFit:'contain', margin:'0 auto 20px' }} />
+          </Link>
+          <h1 style={{ fontFamily:'"Playfair Display",Georgia,serif', fontSize:26, fontWeight:700,
+            color:INK, margin:'0 0 6px' }}>
+            Welcome Back
+          </h1>
+          <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, color:MUTE }}>
+            Sign in to your account
+          </p>
+        </div>
 
-          {/* Brand mark */}
-          <div className="text-center mb-8">
-            <div className="w-14 h-14 rounded-full flex items-center justify-center mx-auto mb-4"
-                 style={{ background: `linear-gradient(135deg, ${PINK}, ${ROSE})` }}>
-              <span className="text-white font-cursive text-2xl font-bold">K</span>
-            </div>
-            <h1 className="font-serif text-2xl font-bold mb-1" style={{ color: BERRY }}>Welcome Back</h1>
-            <p className="font-sans text-sm" style={{ color: MAUVE }}>
-              Sign in to your Kurti Cove account
-            </p>
-          </div>
+        {/* Card */}
+        <div style={{ background:WHT, border:`1px solid ${RULE}`, padding:'32px 32px 28px' }}>
 
-          {/* Error banner */}
           {errorParam === 'unauthorized' && (
-            <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-600 rounded-xl px-4 py-3 text-sm font-sans mb-5">
-              <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />
-              Admin access required. Please login with an admin account.
+            <div style={{ display:'flex', alignItems:'flex-start', gap:8,
+              background:'#fef2f2', border:'1px solid #fecaca',
+              padding:'10px 14px', marginBottom:20 }}>
+              <AlertCircle size={14} color="#dc2626" style={{ flexShrink:0, marginTop:1 }} />
+              <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, color:'#dc2626', margin:0 }}>
+                Admin access required. Please use an admin account.
+              </p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <InputField
-              label="Email" type="email" name="email"
-              value={form.email} onChange={handleChange}
-              placeholder="Enter your email"
-              autoComplete="email" required
-            />
-            <InputField
-              label="Password" type="password" name="password"
-              value={form.password} onChange={handleChange}
-              placeholder="Enter your password"
-              autoComplete="current-password" required
-            />
+          <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:18 }}>
+            <InputField label="Email" type="email" name="email" value={form.email}
+              onChange={handleChange} placeholder="your@email.com"
+              autoComplete="email" required />
+            <InputField label="Password" type="password" name="password" value={form.password}
+              onChange={handleChange} placeholder="Enter your password"
+              autoComplete="current-password" required />
 
-            <button
-              type="submit" disabled={loading}
-              className="w-full text-white py-3.5 rounded-xl font-sans font-semibold text-sm transition-all hover:shadow-lg hover:-translate-y-0.5 active:translate-y-0 disabled:opacity-60 disabled:cursor-not-allowed mt-2"
-              style={{ background: ROSE }}
-            >
+            <button type="submit" disabled={loading} style={{
+              width:'100%', padding:'13px 0', background: loading ? '#444' : INK,
+              color:WHT, border:'none', cursor: loading ? 'not-allowed' : 'pointer',
+              fontFamily:'Poppins,sans-serif', fontSize:12, fontWeight:600,
+              letterSpacing:'0.14em', textTransform:'uppercase',
+              transition:'background 0.18s', marginTop:4,
+            }}>
               {loading ? 'Signing in…' : 'Sign In'}
             </button>
           </form>
 
-          <div className="mt-6 flex items-center gap-3">
-            <div className="flex-1 h-px" style={{ background: BORDER }} />
-            <span className="text-xs font-sans" style={{ color: PINK }}>or</span>
-            <div className="flex-1 h-px" style={{ background: BORDER }} />
+          <div style={{ display:'flex', alignItems:'center', gap:12, margin:'20px 0' }}>
+            <div style={{ flex:1, height:1, background:RULE }} />
+            <span style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE }}>or</span>
+            <div style={{ flex:1, height:1, background:RULE }} />
           </div>
 
-          <p className="text-center font-sans text-sm mt-5" style={{ color: MAUVE }}>
-            New to Kurti Cove?{' '}
-            <Link href="/register" className="font-semibold transition-colors" style={{ color: ROSE }}>
-              Create Account →
+          <p style={{ textAlign:'center', fontFamily:'Poppins,sans-serif', fontSize:13, color:MUTE, margin:0 }}>
+            New here?{' '}
+            <Link href="/register" style={{ color:INK, fontWeight:600, textDecoration:'underline' }}>
+              Create account
             </Link>
           </p>
         </div>
 
-        <p className="text-center mt-5 font-sans text-xs" style={{ color: PINK }}>
+        <p style={{ textAlign:'center', fontFamily:'Poppins,sans-serif', fontSize:11,
+          color:MUTE, marginTop:16 }}>
           Trusted by 10,000+ women across India
         </p>
       </div>
@@ -169,9 +163,9 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: CREAM }}>
-        <div className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin"
-             style={{ borderColor: ROSE, borderTopColor: 'transparent' }} />
+      <div style={{ minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#fafafa' }}>
+        <div style={{ width:28, height:28, borderRadius:'50%', border:`2.5px solid ${INK}`, borderTopColor:'transparent', animation:'spin .7s linear infinite' }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     }>
       <LoginForm />

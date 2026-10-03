@@ -78,17 +78,33 @@ export default function RootLayout({ children }) {
             toastOptions={{
               duration: 3000,
               style: {
-                background: '#FCFAE0',
-                color: '#7B2447',
-                border: '1px solid #F5C8D4',
-                borderRadius: '12px',
+                background: '#1a1a1a',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '4px',
                 fontFamily: 'Poppins, sans-serif',
                 fontSize: '13px',
+                fontWeight: '400',
+                letterSpacing: '0.02em',
+                padding: '12px 16px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.22)',
                 marginBottom: '16px',
                 marginRight: '8px',
+                maxWidth: '340px',
               },
               success: {
-                iconTheme: { primary: '#E05C88', secondary: '#FCFAE0' },
+                style: {
+                  background: '#1a1a1a',
+                  color: '#ffffff',
+                },
+                iconTheme: { primary: '#E05C88', secondary: '#1a1a1a' },
+              },
+              error: {
+                style: {
+                  background: '#1a1a1a',
+                  color: '#ffffff',
+                },
+                iconTheme: { primary: '#ef4444', secondary: '#1a1a1a' },
               },
             }}
           />

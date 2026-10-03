@@ -1,68 +1,17 @@
-'use client'
 import Link from 'next/link'
-
-/*
-  FEATURED CATEGORIES — Libas-style
-  ──────────────────────────────────────────────────────────────
-  Desktop : 5 columns × 2 rows = 10 cards
-  Tablet  : 3 columns × wrapping
-  Mobile  : 2 columns × wrapping (same as Libas)
-
-  Each card is a portrait image with a category label badge at
-  the top-left, just like the Libas reference screenshot.
-──────────────────────────────────────────────────────────────*/
+import { staticImg } from '../../lib/staticImg.js'
 
 const CATEGORIES = [
-  {
-    label: 'Kurtis',
-    href:  '/shop?category=kurtis',
-    image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400&q=80',
-  },
-  {
-    label: 'Suits',
-    href:  '/shop?category=suits',
-    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&q=80',
-  },
-  {
-    label: 'Co-ords',
-    href:  '/shop?category=co-ords',
-    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80',
-  },
-  {
-    label: 'Dresses',
-    href:  '/shop?category=dresses',
-    image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80',
-  },
-  {
-    label: 'Plus Sizes',
-    href:  '/shop?category=plus-sizes',
-    image: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&q=80',
-  },
-  {
-    label: 'Shirts',
-    href:  '/shop?category=shirts',
-    image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&q=80',
-  },
-  {
-    label: 'Loungewear',
-    href:  '/shop?category=loungewear',
-    image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400&q=80',
-  },
-  {
-    label: 'Bottoms',
-    href:  '/shop?category=bottoms',
-    image: 'https://images.unsplash.com/photo-1594938298603-c8148c4b4d8e?w=400&q=80',
-  },
-  {
-    label: 'New Arrivals',
-    href:  '/shop?filter=isNewArrival',
-    image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400&q=80',
-  },
-  {
-    label: 'Sale',
-    href:  '/shop?filter=onSale',
-    image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400&q=80',
-  },
+  { label: 'Cotton Kurties',      href: '/shop?category=cotton',     image: staticImg('/category grid/cotton.jpg')     },
+  { label: 'Streight Kurties',    href: '/shop?category=suits',      image: staticImg('/category grid/streight.jpg')   },
+  { label: 'A-line Kurties',      href: '/shop?category=a-line',     image: staticImg('/category grid/a-line.jpg')     },
+  { label: 'Short Kurties',       href: '/shop?category=short',      image: staticImg('/category grid/short.jpg')      },
+  { label: 'Embroidered Kurties', href: '/shop?category=embroidered',image: staticImg('/category grid/embroidery.jpg') },
+  { label: 'Festive Kurtis',      href: '/shop?category=festive',    image: staticImg('/category grid/festive.jpg')    },
+  { label: 'Rayon Kurtis',        href: '/shop?category=rayon',      image: staticImg('/category grid/rayon.jpg')      },
+  { label: 'Printed Kurtis',      href: '/shop?category=printed',    image: staticImg('/category grid/printed.jpg')    },
+  { label: 'Long Kurtis',         href: '/shop?filter=long',         image: staticImg('/category grid/long.jpg')       },
+  { label: 'Co-Ord Kurti Sets',   href: '/shop?filter=co-ord',       image: staticImg('/category grid/co-ord.jpg')     },
 ]
 
 export default function CategoryGrid() {

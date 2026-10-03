@@ -12,7 +12,6 @@ import CustomerReviews from '../components/user/CustomerReviews'
 import VisitOurStores  from '../components/user/VisitOurStores'
 import FestivalSale    from '../components/user/FestivalSale'
 import Combos          from '../components/user/Combos'
-import OfferSection    from '../components/user/FeaturedProducts'
 
 export const metadata = {
   title: 'Kurti Cove — Ethnic Wear for Every Woman',
@@ -57,14 +56,8 @@ export default async function HomePage() {
       <FestiveLooks />
       <CustomerReviews />
       <VisitOurStores />
-      {/*
-        Pass initialData only when we have real data.
-        null means "please fetch yourself" — never pass empty arrays
-        as that silently suppresses the client-side fetch.
-      */}
       <FestivalSale />
-      <Combos       initialData={home?.combos?.length       ? home.combos       : null} />
-      <OfferSection initialData={home?.deals60?.length      ? home.deals60      : null} />
+      <Combos initialData={home?.combos?.length ? home.combos : null} />
     </div>
   )
 }

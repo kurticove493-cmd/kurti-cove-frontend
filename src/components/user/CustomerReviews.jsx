@@ -14,49 +14,15 @@ import { useState, useEffect, useRef, useCallback } from 'react'
   • Prev / Next arrow buttons on the sides
 */
 
+import { staticImg } from '../../lib/staticImg.js'
+
 const REVIEWS = [
-  {
-    id: 1,
-    text: 'Absolutely love the quality! The fabric is so soft and the fit is perfect. Will definitely order again.',
-    name: '_Priya Sharma',
-    image: 'https://images.unsplash.com/photo-1583391733956-3750e0ff4e8b?w=400&q=80',
-    rating: 5,
-  },
-  {
-    id: 2,
-    text: 'Beautiful kurti, the embroidery detail is stunning. Got so many compliments at the function!',
-    name: '_Anjali Singh',
-    image: 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?w=400&q=80',
-    rating: 5,
-  },
-  {
-    id: 3,
-    text: 'No words needed, the outfit says it all. Packaging was great and delivery was super fast.',
-    name: '_Meera Patel',
-    image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400&q=80',
-    rating: 5,
-  },
-  {
-    id: 4,
-    text: 'Getting ready felt like a whole Bollywood scene! The colors are so vibrant and true to the photos.',
-    name: '_Ritika Joshi',
-    image: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&q=80',
-    rating: 5,
-  },
-  {
-    id: 5,
-    text: 'My festive wardrobe just got an upgrade. Breathable, breezy and oh-so-easy on the pocket!',
-    name: '_Kavya Nair',
-    image: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&q=80',
-    rating: 5,
-  },
-  {
-    id: 6,
-    text: 'Ordered 3 kurtis and all of them fit perfectly. The stitching quality is excellent. Highly recommend!',
-    name: '_Sneha Gupta',
-    image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400&q=80',
-    rating: 5,
-  },
+  { id:1, text:'Absolutely love the quality! The fabric is so soft and the fit is perfect. Will definitely order again.', name:'_Priya Sharma',  image: staticImg('/customer review/cotton.jpg'),     rating:5 },
+  { id:2, text:'Beautiful kurti, the embroidery detail is stunning. Got so many compliments at the function!',         name:'_Anjali Singh',  image: staticImg('/customer review/embroidery.png'), rating:5 },
+  { id:3, text:'No words needed, the outfit says it all. Packaging was great and delivery was super fast.',            name:'_Meera Patel',   image: staticImg('/customer review/short.jpg'),      rating:5 },
+  { id:4, text:'Getting ready felt like a whole Bollywood scene! The colors are so vibrant and true to the photos.',   name:'_Ritika Joshi',  image: staticImg('/customer review/printed.jpg'),    rating:5 },
+  { id:5, text:'My festive wardrobe just got an upgrade. Breathable, breezy and oh-so-easy on the pocket!',           name:'_Kavya Nair',    image: staticImg('/customer review/festive.jpg'),    rating:5 },
+  { id:6, text:'Ordered 3 kurtis and all of them fit perfectly. The stitching quality is excellent. Highly recommend!',name:'_Sneha Gupta',   image: staticImg('/customer review/combo.jpg'),      rating:5 },
 ]
 
 function StarRating({ count = 5 }) {

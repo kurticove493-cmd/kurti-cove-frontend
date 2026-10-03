@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { FiArrowRight } from 'react-icons/fi'
 import ProductCard from './ProductCard'
+import { staticImg } from '../../lib/staticImg.js'
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/'
 
@@ -72,7 +73,7 @@ export default function Combos({ initialData }) {
 
   return (
     <section className="relative py-14 px-4 md:px-8 overflow-hidden"
-      style={{ backgroundImage: 'url(/bg%20image/best%20seller%20bg.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      style={{ backgroundImage: `url(${staticImg('/bg image/best seller bg.jpg')})`, backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(240,255,250,0.92)' }} aria-hidden="true" />
       <div className="relative z-10 max-w-7xl mx-auto">
         <div className="flex items-end justify-between mb-3">

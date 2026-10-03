@@ -5,118 +5,168 @@ import { useSelector, useDispatch } from 'react-redux'
 import { emptycart } from '../../redux/features/CartSlice'
 import API from '../../utils/Helper'
 import toast from 'react-hot-toast'
-import {
-  MapPin, Plus, Check, Truck, AlertTriangle,
-  Loader2, Smartphone, Wallet, Ban, Trash2, QrCode,
-} from 'lucide-react'
+import { MapPin, Plus, Check, Truck, AlertTriangle, Loader2, Trash2 } from 'lucide-react'
 
-/* ── Palette ── */
-const ROSE     = '#E05C88'
-const BERRY    = '#7B2447'
-const MAUVE    = '#6B4553'
-const PINK     = '#F8A5B5'
-const BORDER   = '#F5C8D4'
-const PEACH_LT = '#FEF0E3'
-const CARD     = '#FFFAF5'
+const INK  = '#141414'
+const MUTE = '#888'
+const RULE = '#e8e8e8'
+const WHT  = '#ffffff'
+const PLUM = '#7B1153'
 
-const emptyAddr = { fullName: '', mobile: '', pincode: '', addressLine: '', city: '', state: '' }
-
-const STORE_UPI  = process.env.NEXT_PUBLIC_STORE_UPI_ID || 'yourupi@upi'
+const emptyAddr = { fullName:'', mobile:'', pincode:'', addressLine:'', city:'', state:'' }
+const STORE_UPI  = process.env.NEXT_PUBLIC_STORE_UPI_ID || ''
 const STORE_NAME = process.env.NEXT_PUBLIC_STORE_NAME   || 'Kurti Cove'
 
-/* ── ₹49 below ₹300, FREE at/above ₹300 ── */
-const calcDelivery = (subtotal) => (subtotal < 300 ? 49 : 0)
+const calcDelivery = sub => sub < 300 ? 49 : 0
 
-/* ── Build UPI intent URL ── */
-const buildUpiUrl = (amount, ref) =>
-  `upi://pay?pa=${encodeURIComponent(STORE_UPI)}&pn=${encodeURIComponent(STORE_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent('KurtiCove-' + ref)}`
-
-/* ── QR via Google Charts ── */
-function UpiQR({ url, amount }) {
-  const src = `https://chart.googleapis.com/chart?cht=qr&chs=200x200&chl=${encodeURIComponent(url)}&choe=UTF-8`
-  return (
-    <div className="text-center">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={src} alt="UPI QR Code" width={200} height={200}
-        className="rounded-2xl mx-auto mb-3"
-        style={{ border: `1px solid ${BORDER}` }} />
-      <p className="font-sans text-xs" style={{ color: MAUVE }}>
-        Scan with any UPI app to pay <strong style={{ color: BERRY }}>₹{amount.toLocaleString()}</strong>
-      </p>
-      <p className="font-mono text-xs mt-1 font-bold" style={{ color: BERRY }}>{STORE_UPI}</p>
-    </div>
-  )
+const buildUpiUrl = (amount, ref, app) => {
+  const base = `upi://pay?pa=${encodeURIComponent(STORE_UPI)}&pn=${encodeURIComponent(STORE_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent('KurtiCove-'+ref)}`
+  /* deep-link each app to its own intent scheme */
+  if (app === 'phonepe')   return `phonepe://pay?pa=${encodeURIComponent(STORE_UPI)}&pn=${encodeURIComponent(STORE_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent('KurtiCove-'+ref)}`
+  if (app === 'googlepay') return `tez://upi/pay?pa=${encodeURIComponent(STORE_UPI)}&pn=${encodeURIComponent(STORE_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent('KurtiCove-'+ref)}`
+  return base
 }
 
-/* ── Input field ── */
-function Field({ label, name, value, onChange, placeholder, type = 'text' }) {
+const PAGE_CSS = `
+  .co { background:#fafafa; min-height:100vh; }
+  .co *, .co *::before, .co *::after { box-sizing:border-box; }
+  .co-card { background:#fff; border:1px solid ${RULE}; padding:24px; margin-bottom:16px; }
+  .co-input {
+    width:100%; padding:10px 14px;
+    font-family:Poppins,sans-serif; font-size:13px; color:${INK};
+    border:1px solid ${RULE}; background:${WHT};
+    outline:none; border-radius:0;
+    transition:border-color 0.15s;
+  }
+  .co-input:focus { border-color:${INK}; }
+  .co-label {
+    display:block; font-family:Poppins,sans-serif; font-size:10px; font-weight:600;
+    letter-spacing:0.12em; text-transform:uppercase; color:${MUTE}; margin-bottom:5px;
+  }
+  .co-pay-card {
+    display:flex; align-items:center; gap:14px;
+    padding:14px 16px; border:1.5px solid ${RULE};
+    cursor:pointer; transition:border-color 0.15s, background 0.15s;
+    margin-bottom:10px;
+  }
+  .co-pay-card.active { border-color:${INK}; background:#fafafa; }
+  .co-pay-card:hover  { border-color:#bbb; }
+  .co-radio {
+    width:18px; height:18px; border-radius:50%;
+    border:1.5px solid #ccc; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+    transition:border-color 0.15s;
+  }
+  .co-pay-card.active .co-radio { border-color:${INK}; }
+  .co-addr-card {
+    padding:14px 16px; border:1.5px solid ${RULE};
+    cursor:pointer; transition:border-color 0.15s; margin-bottom:10px;
+  }
+  .co-addr-card.selected { border-color:${INK}; }
+  .co-btn-primary {
+    width:100%; padding:14px 0;
+    background:${INK}; color:${WHT}; border:none; cursor:pointer;
+    font-family:Poppins,sans-serif; font-size:12px; font-weight:600;
+    letter-spacing:0.14em; text-transform:uppercase;
+    display:flex; align-items:center; justify-content:center; gap:8px;
+    transition:background 0.18s;
+  }
+  .co-btn-primary:disabled { background:#aaa; cursor:not-allowed; }
+  .co-section-title {
+    font-family:Poppins,sans-serif; font-size:11px; font-weight:600;
+    letter-spacing:0.14em; text-transform:uppercase; color:${INK};
+    margin-bottom:16px;
+  }
+`
+
+function Field({ label, name, value, onChange, placeholder, type='text' }) {
   return (
     <div>
-      <label className="block text-xs font-semibold mb-1 font-sans" style={{ color: BERRY }}>{label}</label>
-      <input name={name} value={value} onChange={onChange} placeholder={placeholder} type={type}
-        className="w-full border rounded-xl px-4 py-2.5 text-sm font-sans outline-none transition-all"
-        style={{ borderColor: BORDER, color: BERRY, background: CARD }}
-        onFocus={(e) => { e.target.style.borderColor = ROSE; e.target.style.boxShadow = `0 0 0 2px ${ROSE}22` }}
-        onBlur={(e)  => { e.target.style.borderColor = BORDER; e.target.style.boxShadow = 'none' }} />
+      <label className="co-label">{label}</label>
+      <input className="co-input" name={name} value={value} onChange={onChange}
+        placeholder={placeholder} type={type} />
     </div>
   )
 }
 
-/* ═══════════════════════ MAIN PAGE ═══════════════════════════ */
+/* Unused on desktop — mobile uses window.location.href directly */
+
+/* Payment option with real app icon */
+function PayOption({ value, label, logoSrc, active, onClick }) {
+  return (
+    <div className={`co-pay-card${active?' active':''}`} onClick={onClick}>
+      <div className="co-radio">
+        {active && <div style={{ width:8, height:8, borderRadius:'50%', background:INK }} />}
+      </div>
+      <div style={{ width:36, height:36, display:'flex', alignItems:'center', justifyContent:'center',
+        background:'#f5f5f5', flexShrink:0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={logoSrc} alt={label} style={{ width:28, height:28, objectFit:'contain' }} />
+      </div>
+      <div style={{ flex:1 }}>
+        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13, fontWeight:500, color:INK, margin:0 }}>
+          {label}
+        </p>
+        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE, margin:0 }}>
+          Pay via {label} UPI app
+        </p>
+      </div>
+    </div>
+  )
+}
+
+const PAY_OPTIONS = [
+  { value:'phonepe',   label:'PhonePe',    logo:'/icons/phonepe-icon.webp'    },
+  { value:'googlepay', label:'Google Pay', logo:'/icons/google-pay-icon.webp' },
+  { value:'upi',       label:'UPI',        logo:'/icons/upi-icon.webp'        },
+]
+
 export default function CheckoutPage() {
   const router   = useRouter()
   const dispatch = useDispatch()
-  const { items, totalPrice } = useSelector((s) => s.cart)
+  const { items, totalPrice } = useSelector(s => s.cart)
 
   const [savedAddresses,  setSavedAddresses]  = useState([])
   const [selectedAddrIdx, setSelectedAddrIdx] = useState(null)
   const [showNewForm,     setShowNewForm]      = useState(false)
   const [newAddr,         setNewAddr]          = useState(emptyAddr)
-  const [payMethod,       setPayMethod]        = useState('upi')
+  const [payMethod,       setPayMethod]        = useState('phonepe')
   const [payError,        setPayError]         = useState('')
   const [addrTouched,     setAddrTouched]      = useState(false)
   const [deletingIdx,     setDeletingIdx]      = useState(null)
-  /* Desktop: after Proceed clicked, show QR fallback */
-  const [showQr,          setShowQr]           = useState(false)
-  /* Placing state — shows spinner on the button */
   const [placing,         setPlacing]          = useState(false)
-  /* Ref to store the created orderId so we can redirect after returning from UPI app */
   const pendingOrderRef = useRef(null)
 
   const deliveryCharge = calcDelivery(totalPrice)
   const finalTotal     = totalPrice + deliveryCharge
 
-  /* ── Fetch saved addresses ── */
   useEffect(() => {
-    const fetch_ = async () => {
-      try {
-        const res = await API.get('/user/get')
-        if (res.data.success) {
-          const addrs = res.data.data.addresses || []
-          setSavedAddresses(addrs)
-          if (addrs.length === 0) setShowNewForm(true)
-        }
-      } catch { setShowNewForm(true) }
-    }
-    fetch_()
-  }, [])
+    API.get('/user/get').then(res => {
+      if (res.data.success) {
+        const addrs = res.data.data.addresses || []
+        setSavedAddresses(addrs)
+        if (addrs.length === 0) setShowNewForm(true)
+      }
+    }).catch(err => {
+      if (err.response?.status === 401) { router.push('/login?redirect=/checkout'); return }
+      setShowNewForm(true)
+    })
+  }, [router])
 
-  /*
-    When the user returns from the UPI app (page becomes visible again),
-    if we have a pending order ID stored in sessionStorage, clear the cart
-    and redirect to the thank-you page.
-  */
+  /* Visibility: handle return from UPI app */
   useEffect(() => {
     const onVisible = () => {
       if (document.visibilityState === 'visible') {
-        const pendingId = sessionStorage.getItem('kc_pending_order_id')
+        const pendingId     = sessionStorage.getItem('kc_pending_order_id')
         const pendingMethod = sessionStorage.getItem('kc_pending_order_method') || 'upi'
+        const pendingAmount = sessionStorage.getItem('kc_pending_order_amount') || '0'
         if (pendingId) {
           sessionStorage.removeItem('kc_pending_order_id')
           sessionStorage.removeItem('kc_pending_order_method')
+          sessionStorage.removeItem('kc_pending_order_amount')
           dispatch(emptycart())
           try { API.delete('/cart/clear') } catch { /* silent */ }
-          router.push(`/thank-you/${pendingId}?method=${pendingMethod}&amount=${finalTotal}`)
+          router.push(`/thank-you/${pendingId}?method=${pendingMethod}&amount=${pendingAmount}`)
         }
       }
     }
@@ -130,16 +180,14 @@ export default function CheckoutPage() {
     return null
   }, [showNewForm, savedAddresses, selectedAddrIdx, newAddr])
 
-  const handleNewAddrChange = (e) => {
+  const handleNewAddrChange = e => {
     const { name, value } = e.target
-    setNewAddr((p) => ({ ...p, [name]: value }))
+    setNewAddr(p => ({ ...p, [name]:value }))
     setAddrTouched(true)
   }
 
-  const handleSelectSaved = (i) => {
-    setSelectedAddrIdx(i)
-    setShowNewForm(false)
-    setAddrTouched(true)
+  const handleSelectSaved = i => {
+    setSelectedAddrIdx(i); setShowNewForm(false); setAddrTouched(true)
   }
 
   const handleDeleteAddress = async (idx, e) => {
@@ -147,323 +195,296 @@ export default function CheckoutPage() {
     if (!confirm('Remove this address?')) return
     setDeletingIdx(idx)
     try {
-      await API.put('/user/deleteaddress', { index: idx })
-      setSavedAddresses((prev) => prev.filter((_, i) => i !== idx))
-      if (selectedAddrIdx === idx) {
-        setSelectedAddrIdx(null)
-        if (savedAddresses.length - 1 === 0) setShowNewForm(true)
-      } else if (selectedAddrIdx > idx) setSelectedAddrIdx((p) => p - 1)
-    } catch { /* silent */ }
-    finally { setDeletingIdx(null) }
+      await API.put('/user/deleteaddress', { index:idx })
+      setSavedAddresses(prev => prev.filter((_,i) => i!==idx))
+      if (selectedAddrIdx === idx) { setSelectedAddrIdx(null); if (savedAddresses.length-1===0) setShowNewForm(true) }
+      else if (selectedAddrIdx > idx) setSelectedAddrIdx(p => p-1)
+    } catch {/* silent */} finally { setDeletingIdx(null) }
   }
 
-  /* ── Validate address fields synchronously ── */
   const validateSync = useCallback(() => {
     if (items.length === 0) { setPayError('Your cart is empty.'); return false }
-    const addr = getAddress()
-    if (!addr?.fullName || !addr?.mobile || !addr?.pincode || !addr?.addressLine || !addr?.city || !addr?.state) {
-      setPayError('Please complete all address fields.')
+    const token = typeof window !== 'undefined' ? localStorage.getItem('kc_token') : null
+    if (!token) {
+      setPayError('Please login to place an order.')
+      setTimeout(() => router.push('/login?redirect=/checkout'), 1500)
       return false
     }
+    const addr = getAddress()
+    if (!addr?.fullName || !addr?.mobile || !addr?.pincode || !addr?.addressLine || !addr?.city || !addr?.state) {
+      setPayError('Please complete all address fields.'); return false
+    }
     return true
-  }, [items, getAddress])
+  }, [items, getAddress, router])
 
   /*
-    HANDLE PROCEED — UPI DIRECT REDIRECT
-    ─────────────────────────────────────────────────────────────
-    Browser rule: intent URL must be set in the SAME synchronous
-    call stack as the user gesture (click). We cannot await anything
-    before window.location.href = upiUrl.
-
-    Flow:
-    1. Validate address (sync, no API)
-    2. Detect desktop vs mobile
-    3a. MOBILE: set window.location.href synchronously (opens UPI app)
-         Then create the order asynchronously in the background.
-         When user returns, visibilitychange handler redirects.
-    3b. DESKTOP: show QR panel + create order, then redirect to thank-you.
+    PROCEED — direct UPI app redirect on mobile, QR on desktop.
+    UPI URL must be set SYNCHRONOUSLY in the click handler.
   */
   const handleProceed = async () => {
     setPayError('')
     if (!validateSync()) return
 
     const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-    const upiUrl   = buildUpiUrl(finalTotal, 'REF' + Date.now())
+    const ref      = 'REF' + Date.now()
+    const upiUrl   = buildUpiUrl(finalTotal, ref, payMethod)
     const address  = getAddress()
 
     if (isMobile) {
-      /*
-        Step 1: open UPI app IMMEDIATELY (must be synchronous).
-        The page goes to background; the order creation happens after.
-      */
+      /* SYNCHRONOUS — must happen in same call stack as click */
       window.location.href = upiUrl
 
-      /*
-        Step 2: create order in the background while UPI app is open.
-        Store the order ID in sessionStorage so visibilitychange can
-        redirect when the user comes back.
-      */
+      /* Create order in background after redirect */
       try {
-        const res = await API.post('/order/place', {
-          address,
-          paymentMethod: payMethod,
-          paymentStatus: 'pending_verification',
-        })
+        const res = await API.post('/order/place', { address, paymentMethod:payMethod, paymentStatus:'pending_verification' })
         if (res.data.success) {
           sessionStorage.setItem('kc_pending_order_id',     res.data.data._id)
           sessionStorage.setItem('kc_pending_order_method', payMethod)
+          sessionStorage.setItem('kc_pending_order_amount', String(finalTotal))
         }
-      } catch { /* silent — visibilitychange will fall through gracefully */ }
+      } catch { /* silent */ }
 
     } else {
-      /*
-        DESKTOP fallback: show QR code panel + create order synchronously.
-      */
+      /* Desktop: create order then redirect straight to thank-you — no QR, no confirm button */
       setPlacing(true)
       try {
-        const res = await API.post('/order/place', {
-          address,
-          paymentMethod: payMethod,
-          paymentStatus: 'pending_verification',
-        })
+        const res = await API.post('/order/place', { address, paymentMethod:payMethod, paymentStatus:'pending_verification' })
         if (res.data.success) {
-          pendingOrderRef.current = { id: res.data.data._id, method: payMethod }
-          setShowQr(true)
           dispatch(emptycart())
           try { await API.delete('/cart/clear') } catch { /* silent */ }
+          router.push(`/thank-you/${res.data.data._id}?method=${payMethod}&amount=${finalTotal}`)
         } else {
           setPayError('Order could not be placed. Please try again.')
         }
       } catch (err) {
-        setPayError(err.response?.data?.msg || 'Something went wrong. Please try again.')
-      } finally {
-        setPlacing(false)
-      }
+        const msg = err.response?.data?.msg || err.message || 'Something went wrong.'
+        if (err.response?.status === 401) {
+          setPayError('Session expired. Please login again.')
+          setTimeout(() => router.push('/login?redirect=/checkout'), 1500)
+        } else { setPayError(msg) }
+      } finally { setPlacing(false) }
     }
   }
 
-  /* After showing QR on desktop, user clicks "I've Paid — Confirm" */
-  const handleDesktopConfirm = () => {
-    if (!pendingOrderRef.current) return
-    router.push(`/thank-you/${pendingOrderRef.current.id}?method=${pendingOrderRef.current.method}&amount=${finalTotal}`)
-  }
-
-  const codDisabled = addrTouched
-
-  const UPI_OPTIONS = [
-    { value: 'phonepe',   label: 'PhonePe',   Icon: Smartphone },
-    { value: 'googlepay', label: 'Google Pay', Icon: Wallet     },
-    { value: 'upi',       label: 'UPI',        Icon: Wallet     },
-  ]
-
-  /* ── Address card ── */
-  const AddrCard = ({ addr, i, selected }) => (
-    <div onClick={() => handleSelectSaved(i)}
-      className="p-4 rounded-xl border-2 cursor-pointer transition-all"
-      style={{ borderColor: selected ? ROSE : BORDER, background: selected ? PEACH_LT : 'white' }}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <p className="font-sans font-semibold text-sm" style={{ color: BERRY }}>{addr.fullName}</p>
-          <p className="font-sans text-xs mt-0.5" style={{ color: MAUVE }}>{addr.mobile}</p>
-          <p className="font-sans text-xs mt-0.5" style={{ color: MAUVE }}>
-            {addr.addressLine}, {addr.city}, {addr.state} — {addr.pincode}
-          </p>
-        </div>
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {selected && (
-            <div className="w-5 h-5 rounded-full flex items-center justify-center" style={{ background: ROSE }}>
-              <Check size={11} className="text-white" />
-            </div>
-          )}
-          <button onClick={(e) => handleDeleteAddress(i, e)} disabled={deletingIdx === i}
-            className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-all disabled:opacity-40"
-            aria-label="Delete address">
-            {deletingIdx === i ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} />}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-
-  /* ── Payment option card ── */
-  const PayCard = ({ value, label, Icon }) => {
-    const active = payMethod === value
-    return (
-      <div onClick={() => { setPayMethod(value); setPayError(''); setShowQr(false) }}
-        className="flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all"
-        style={{ borderColor: active ? ROSE : BORDER, background: active ? PEACH_LT : 'white' }}>
-        <div className="mt-0.5 w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-all"
-             style={{ borderColor: active ? ROSE : PINK, background: active ? ROSE : 'white' }}>
-          {active && <div className="w-2 h-2 rounded-full bg-white" />}
-        </div>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <Icon size={16} style={{ color: ROSE }} />
-            <p className="font-sans font-semibold text-sm" style={{ color: BERRY }}>{label}</p>
-          </div>
-          <p className="font-sans text-xs mt-0.5" style={{ color: MAUVE }}>Pay via {label} UPI app</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
-    <main className="min-h-screen py-10 bg-white">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6">
-        <h1 className="font-sans text-3xl font-bold mb-8" style={{ color: BERRY }}>Checkout</h1>
+    <>
+      <style>{PAGE_CSS}</style>
+      <main className="co">
+        <div style={{ maxWidth:1100, margin:'0 auto', padding:'32px 16px 64px' }}>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* ── LEFT ── */}
-          <div className="lg:col-span-2 space-y-5">
-
-            {/* Address */}
-            <div className="bg-white rounded-[16px] p-6 shadow-card" style={{ border: `1px solid ${BORDER}` }}>
-              <h2 className="font-sans text-xl font-bold flex items-center gap-2 mb-5" style={{ color: BERRY }}>
-                <MapPin size={18} style={{ color: ROSE }} /> Delivery Address
-              </h2>
-              {savedAddresses.length > 0 && (
-                <div className="space-y-3 mb-5">
-                  {savedAddresses.map((addr, i) => (
-                    <AddrCard key={i} addr={addr} i={i} selected={selectedAddrIdx === i && !showNewForm} />
-                  ))}
-                  <button onClick={() => { setShowNewForm(!showNewForm); setSelectedAddrIdx(null) }}
-                    className="flex items-center gap-2 text-sm font-medium font-sans" style={{ color: ROSE }}>
-                    <Plus size={15} /> {showNewForm ? 'Cancel' : 'Add new address'}
-                  </button>
-                </div>
-              )}
-              {(showNewForm || savedAddresses.length === 0) && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {[
-                    { name: 'fullName',    label: 'Full Name',    placeholder: 'Priya Sharma' },
-                    { name: 'mobile',      label: 'Mobile',       placeholder: '9876543210' },
-                    { name: 'pincode',     label: 'Pincode',      placeholder: '400001' },
-                    { name: 'addressLine', label: 'Address Line', placeholder: 'House / Street / Area', full: true },
-                    { name: 'city',        label: 'City',         placeholder: 'Mumbai' },
-                    { name: 'state',       label: 'State',        placeholder: 'Maharashtra' },
-                  ].map((f) => (
-                    <div key={f.name} className={f.full ? 'sm:col-span-2' : ''}>
-                      <Field label={f.label} name={f.name} value={newAddr[f.name]}
-                        onChange={handleNewAddrChange} placeholder={f.placeholder} />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Payment method */}
-            <div className="bg-white rounded-[16px] p-6 shadow-card" style={{ border: `1px solid ${BORDER}` }}>
-              <h2 className="font-sans text-xl font-bold mb-4" style={{ color: BERRY }}>Payment Method</h2>
-              <div className="space-y-3">
-                {UPI_OPTIONS.map(({ value, label, Icon }) => (
-                  <PayCard key={value} value={value} label={label} Icon={Icon} />
-                ))}
-                {/* COD — disabled */}
-                <div className="flex items-start gap-4 p-4 rounded-xl border-2 opacity-50 cursor-not-allowed"
-                     style={{ borderColor: BORDER, background: 'white' }}>
-                  <div className="mt-0.5 w-5 h-5 rounded-full border-2 flex-shrink-0" style={{ borderColor: PINK }} />
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2">
-                      <Ban size={15} className="text-gray-400" />
-                      <p className="font-sans font-semibold text-sm text-gray-400">Cash on Delivery</p>
-                    </div>
-                    {codDisabled
-                      ? <p className="font-sans text-xs text-amber-600 mt-0.5 flex items-center gap-1"><AlertTriangle size={11} /> Not available for this area</p>
-                      : <p className="font-sans text-xs text-gray-400 mt-0.5">Pay when your order arrives</p>}
-                  </div>
-                </div>
-              </div>
-              {payError && (
-                <div className="mt-4 flex items-start gap-2 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
-                  <AlertTriangle size={15} className="text-red-500 flex-shrink-0 mt-0.5" />
-                  <p className="font-sans text-sm text-red-600">{payError}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Desktop QR panel — shown after Proceed on desktop */}
-            {showQr && pendingOrderRef.current && (
-              <div className="bg-white rounded-[16px] p-6 shadow-card" style={{ border: `2px solid ${ROSE}` }}>
-                <div className="flex items-center gap-2 mb-5">
-                  <QrCode size={20} style={{ color: ROSE }} />
-                  <h2 className="font-sans text-xl font-bold" style={{ color: BERRY }}>Scan to Pay</h2>
-                </div>
-                <UpiQR url={buildUpiUrl(finalTotal, 'REF' + Date.now())} amount={finalTotal} />
-                <p className="font-sans text-xs text-center mt-3 mb-5" style={{ color: MAUVE }}>
-                  Open PhonePe, GPay, or any UPI app — scan this QR to complete payment.
-                </p>
-                <button onClick={handleDesktopConfirm}
-                  className="w-full text-white py-3.5 rounded-xl font-sans font-semibold text-sm transition-all hover:shadow-lg flex items-center justify-center gap-2"
-                  style={{ background: ROSE }}>
-                  <Check size={16} /> I've Paid — View My Order
-                </button>
-              </div>
-            )}
+          {/* Breadcrumb */}
+          <div style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE,
+            marginBottom:24, display:'flex', gap:6 }}>
+            <a href="/" style={{ color:MUTE, textDecoration:'none' }}>Home</a>
+            <span>/</span>
+            <a href="/cart" style={{ color:MUTE, textDecoration:'none' }}>Cart</a>
+            <span>/</span>
+            <span style={{ color:INK }}>Checkout</span>
           </div>
 
-          {/* ── ORDER SUMMARY ── */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-[16px] p-6 shadow-card sticky top-20" style={{ border: `1px solid ${BORDER}` }}>
-              <h2 className="font-sans text-xl font-bold mb-5" style={{ color: BERRY }}>Order Summary</h2>
-              <div className="space-y-3 mb-5 max-h-48 overflow-y-auto">
-                {items.map((item) => (
-                  <div key={item._id} className="flex gap-3 items-center">
-                    <div className="w-12 h-14 rounded-lg overflow-hidden flex-shrink-0" style={{ background: PEACH_LT }}>
-                      {item.images?.[0]
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={item.images[0]} alt={item.name} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full" style={{ background: PEACH_LT }} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-sans text-xs font-medium line-clamp-1" style={{ color: BERRY }}>{item.name}</p>
-                      <p className="font-sans text-xs" style={{ color: PINK }}>Qty: {item.qty}</p>
-                    </div>
-                    <p className="font-sans text-xs font-semibold flex-shrink-0" style={{ color: BERRY }}>
-                      ₹{((item.discountPrice || item.price) * item.qty).toLocaleString()}
+          <h1 style={{ fontFamily:'"Playfair Display",Georgia,serif', fontSize:28,
+            fontWeight:700, color:INK, marginBottom:28 }}>
+            Checkout
+          </h1>
+
+          <div style={{ display:'flex', gap:28, alignItems:'flex-start', flexWrap:'wrap' }}>
+
+            {/* ── LEFT ── */}
+            <div style={{ flex:'1 1 480px', minWidth:0 }}>
+
+              {/* Delivery Address */}
+              <div className="co-card">
+                <p className="co-section-title">
+                  <MapPin size={13} strokeWidth={1.8} style={{ verticalAlign:'middle', marginRight:6 }} />
+                  Delivery Address
+                </p>
+
+                {savedAddresses.length > 0 && (
+                  <div style={{ marginBottom:16 }}>
+                    {savedAddresses.map((addr, i) => (
+                      <div key={i}
+                        className={`co-addr-card${selectedAddrIdx===i&&!showNewForm?' selected':''}`}
+                        onClick={() => handleSelectSaved(i)}>
+                        <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', gap:10 }}>
+                          <div>
+                            <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13, fontWeight:600, color:INK, margin:'0 0 2px' }}>{addr.fullName}</p>
+                            <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, color:MUTE, margin:'0 0 1px' }}>{addr.mobile}</p>
+                            <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, color:MUTE, margin:0 }}>
+                              {addr.addressLine}, {addr.city}, {addr.state} — {addr.pincode}
+                            </p>
+                          </div>
+                          <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
+                            {selectedAddrIdx===i && !showNewForm && (
+                              <div style={{ width:18, height:18, borderRadius:'50%', background:INK,
+                                display:'flex', alignItems:'center', justifyContent:'center' }}>
+                                <Check size={10} color={WHT} strokeWidth={3} />
+                              </div>
+                            )}
+                            <button onClick={e => handleDeleteAddress(i,e)}
+                              disabled={deletingIdx===i}
+                              style={{ background:'none', border:'none', cursor:'pointer',
+                                color:'#ccc', padding:4, transition:'color 0.15s' }}
+                              onMouseEnter={e => e.currentTarget.style.color='#ef4444'}
+                              onMouseLeave={e => e.currentTarget.style.color='#ccc'}>
+                              {deletingIdx===i
+                                ? <Loader2 size={14} style={{ animation:'spin .7s linear infinite' }} />
+                                : <Trash2 size={14} />}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <button onClick={() => { setShowNewForm(v=>!v); setSelectedAddrIdx(null) }}
+                      style={{ display:'inline-flex', alignItems:'center', gap:5,
+                        fontFamily:'Poppins,sans-serif', fontSize:12, fontWeight:500,
+                        color:INK, background:'none', border:'none', cursor:'pointer',
+                        textDecoration:'underline', padding:0 }}>
+                      <Plus size={13} /> {showNewForm ? 'Cancel' : 'Add new address'}
+                    </button>
+                  </div>
+                )}
+
+                {(showNewForm || savedAddresses.length===0) && (
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    {[
+                      { name:'fullName',    label:'Full Name',    placeholder:'Priya Sharma' },
+                      { name:'mobile',      label:'Mobile',       placeholder:'9876543210' },
+                      { name:'pincode',     label:'Pincode',      placeholder:'400001' },
+                      { name:'addressLine', label:'Address Line', placeholder:'House / Street / Area', full:true },
+                      { name:'city',        label:'City',         placeholder:'Mumbai' },
+                      { name:'state',       label:'State',        placeholder:'Maharashtra' },
+                    ].map(f => (
+                      <div key={f.name} style={{ gridColumn: f.full ? 'span 2' : undefined }}>
+                        <Field label={f.label} name={f.name} value={newAddr[f.name]}
+                          onChange={handleNewAddrChange} placeholder={f.placeholder} />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Payment Method */}
+              <div className="co-card">
+                <p className="co-section-title">Payment Method</p>
+                {PAY_OPTIONS.map(opt => (
+                  <PayOption key={opt.value}
+                    value={opt.value} label={opt.label} logoSrc={opt.logo}
+                    active={payMethod===opt.value}
+                    onClick={() => { setPayMethod(opt.value); setPayError(''); setShowQr(false) }}
+                  />
+                ))}
+                {/* COD disabled */}
+                <div style={{ display:'flex', alignItems:'center', gap:14,
+                  padding:'14px 16px', border:`1.5px solid ${RULE}`,
+                  opacity:0.4, cursor:'not-allowed' }}>
+                  <div className="co-radio" />
+                  <div style={{ width:36, height:36, background:'#f5f5f5',
+                    display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+                    <span style={{ fontSize:18 }}>💵</span>
+                  </div>
+                  <div>
+                    <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13, color:MUTE, margin:0 }}>
+                      Cash on Delivery
+                    </p>
+                    <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE, margin:0 }}>
+                      Not available for this area
                     </p>
                   </div>
-                ))}
-              </div>
-              <hr className="mb-4" style={{ borderColor: BORDER }} />
-              <div className="space-y-2 mb-5 font-sans text-sm">
-                <div className="flex justify-between" style={{ color: BERRY }}>
-                  <span>Subtotal</span><span>₹{totalPrice.toLocaleString()}</span>
                 </div>
-                <div className="flex justify-between" style={{ color: BERRY }}>
-                  <span>Delivery</span>
-                  {deliveryCharge === 0
-                    ? <span className="text-green-600 font-medium">FREE</span>
-                    : <span>₹{deliveryCharge}</span>}
-                </div>
-                {totalPrice > 0 && totalPrice < 300 && (
-                  <p className="text-[10px] font-sans" style={{ color: PINK }}>
-                    Add ₹{(300 - totalPrice).toLocaleString()} more for free delivery
-                  </p>
+
+                {payError && (
+                  <div style={{ display:'flex', alignItems:'flex-start', gap:8,
+                    background:'#fef2f2', border:'1px solid #fecaca',
+                    padding:'10px 14px', marginTop:12 }}>
+                    <AlertTriangle size={14} color="#dc2626" style={{ flexShrink:0, marginTop:1 }} />
+                    <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, color:'#dc2626', margin:0 }}>
+                      {payError}
+                    </p>
+                  </div>
                 )}
-                <hr style={{ borderColor: BORDER }} />
-                <div className="flex justify-between font-bold" style={{ color: BERRY }}>
-                  <span>Total</span>
-                  <span className="font-sans text-lg">₹{finalTotal.toLocaleString()}</span>
-                </div>
               </div>
 
-              {!showQr ? (
-                <button onClick={handleProceed} disabled={placing || items.length === 0}
-                  className="w-full text-white py-3.5 rounded-xl font-sans font-semibold text-sm transition-all hover:shadow-lg flex items-center justify-center gap-2 disabled:opacity-60"
-                  style={{ background: ROSE }}>
+              {/* QR panel removed — auto-redirect handles everything */}
+            </div>
+
+            {/* ── ORDER SUMMARY ── */}
+            <div style={{ width:300, flexShrink:0, position:'sticky', top:84 }}>
+              <div style={{ background:WHT, border:`1px solid ${RULE}`, padding:24 }}>
+                <p className="co-section-title">Order Summary</p>
+
+                <div style={{ maxHeight:180, overflowY:'auto', marginBottom:16,
+                  scrollbarWidth:'none' }}>
+                  {items.map(item => (
+                    <div key={item._id} style={{ display:'flex', gap:10,
+                      alignItems:'center', marginBottom:10 }}>
+                      <div style={{ width:44, height:52, background:'#f5f5f5',
+                        overflow:'hidden', flexShrink:0 }}>
+                        {item.images?.[0]
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={item.images[0]} alt={item.name}
+                              style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+                          : <div style={{ width:'100%', height:'100%' }} />}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, fontWeight:500,
+                          color:INK, margin:'0 0 2px', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                          {item.name}
+                        </p>
+                        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE, margin:0 }}>
+                          Qty: {item.qty}
+                        </p>
+                      </div>
+                      <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, fontWeight:600,
+                        color:INK, flexShrink:0 }}>
+                        ₹{((item.discountPrice||item.price)*item.qty).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                <hr style={{ border:'none', borderTop:`1px solid ${RULE}`, marginBottom:14 }} />
+
+                <div style={{ display:'flex', flexDirection:'column', gap:10, marginBottom:16 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between',
+                    fontFamily:'Poppins,sans-serif', fontSize:13, color:INK }}>
+                    <span>Subtotal</span><span>₹{totalPrice.toLocaleString()}</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between',
+                    fontFamily:'Poppins,sans-serif', fontSize:13, color:INK }}>
+                    <span>Delivery</span>
+                    <span style={{ color: deliveryCharge===0 ? '#22c55e' : INK }}>
+                      {deliveryCharge===0 ? 'FREE' : `₹${deliveryCharge}`}
+                    </span>
+                  </div>
+                  {totalPrice > 0 && totalPrice < 300 && (
+                    <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE }}>
+                      Add ₹{(300-totalPrice).toLocaleString()} more for free delivery
+                    </p>
+                  )}
+                </div>
+
+                <hr style={{ border:'none', borderTop:`1px solid ${RULE}`, marginBottom:14 }} />
+
+                <div style={{ display:'flex', justifyContent:'space-between',
+                  fontFamily:'Poppins,sans-serif', fontSize:16, fontWeight:700,
+                  color:INK, marginBottom:20 }}>
+                  <span>Total</span>
+                  <span>₹{finalTotal.toLocaleString()}</span>
+                </div>
+
+                {/* Always show the proceed button — no QR fallback */}
+                <button onClick={handleProceed} className="co-btn-primary"
+                  disabled={placing || items.length===0}>
                   {placing
-                    ? <><Loader2 size={16} className="animate-spin" /> Preparing…</>
+                    ? <><Loader2 size={15} style={{ animation:'spin .7s linear infinite' }} /> Preparing…</>
                     : `Proceed to Pay ₹${finalTotal.toLocaleString()}`}
                 </button>
-              ) : (
-                <div className="text-center text-xs font-sans py-2" style={{ color: PINK }}>
-                  Scan the QR on the left to complete payment
-                </div>
-              )}
+              </div>
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </>
   )
 }

@@ -4,52 +4,44 @@ import { useRouter } from 'next/navigation'
 import API from '../../utils/Helper'
 
 const AdminUserContext = createContext(null)
-
 export const useAdminUser = () => useContext(AdminUserContext)
 
-/**
- * AdminGuard — wraps all admin pages.
- * On mount, fetches /api/user/get and checks role.
- * Redirects to /login?error=unauthorized if not admin/superAdmin.
- */
 export default function AdminGuard({ children }) {
   const [adminUser, setAdminUser] = useState(null)
-  const [checking, setChecking] = useState(true)
+  const [checking, setChecking]   = useState(true)
   const router = useRouter()
 
   useEffect(() => {
-    const verify = async () => {
-      try {
-        const res = await API.get('/user/get')
-        if (res.data.success) {
-          const user = res.data.data
-          if (user.role === 'admin' || user.role === 'superAdmin') {
-            setAdminUser(user)
-          } else {
-            router.replace('/login?error=unauthorized')
-          }
+    API.get('/user/get').then(res => {
+      if (res.data.success) {
+        const u = res.data.data
+        if (u.role === 'admin' || u.role === 'superAdmin') {
+          setAdminUser(u)
         } else {
           router.replace('/login?error=unauthorized')
         }
-      } catch {
+      } else {
         router.replace('/login?error=unauthorized')
-      } finally {
-        setChecking(false)
       }
-    }
-    verify()
+    }).catch(() => router.replace('/login?error=unauthorized'))
+      .finally(() => setChecking(false))
   }, [router])
 
-  if (checking) {
-    return (
-      <div className="min-h-screen bg-[#FAF5FF] flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-[#A855F7] border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="font-sans text-[#C084FC]">Verifying admin access...</p>
-        </div>
+  if (checking) return (
+    <div style={{ minHeight:'100vh', background:'#141414', display:'flex',
+      alignItems:'center', justifyContent:'center' }}>
+      <div style={{ textAlign:'center' }}>
+        <div style={{ width:28, height:28, borderRadius:'50%',
+          border:'2.5px solid #fff', borderTopColor:'transparent',
+          animation:'spin .7s linear infinite', margin:'0 auto 12px' }} />
+        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12,
+          color:'#888', letterSpacing:'0.08em' }}>
+          Verifying access…
+        </p>
       </div>
-    )
-  }
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+    </div>
+  )
 
   if (!adminUser) return null
 

@@ -3,33 +3,34 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { staticImg } from '../../lib/staticImg.js'
 
-const HEADER_H = 68   // matches md:h-[68px]
+const HEADER_H = 68
 
 const SLIDES = [
   {
-    src:     '/hero/image1.png',
+    src:     staticImg('/hero/image1.png'),
     alt:     'Kurti Cove Collection 1',
     href:    '/shop',
     title:   'Utsav',
     subtitle:'A Floral Celebration',
   },
   {
-    src:     '/hero/image2.png',
+    src:     staticImg('/hero/image2.png'),
     alt:     'Kurti Cove Collection 2',
     href:    '/shop?filter=isNewArrival',
     title:   'New Arrivals',
     subtitle:'Fresh Styles, Every Week',
   },
   {
-    src:     '/hero/image3.png',
+    src:     staticImg('/hero/image3.png'),
     alt:     'Kurti Cove Collection 3',
     href:    '/shop?filter=isBestSeller',
     title:   'Best Sellers',
     subtitle:'Loved by Thousands',
   },
   {
-    src:     '/hero/image4.png',
+    src:     staticImg('/hero/image4.png'),
     alt:     'Kurti Cove Collection 4',
     href:    '/#deals60',
     title:   'Big Sale',
@@ -109,27 +110,31 @@ export default function HeroBanner() {
         .kc-marquee:hover { animation-play-state: paused; }
 
         /*
-          Hero fills the full viewport width.
-          Height = 100vw * (9/21) — Libas wide-screen ratio ~21:9.
-          On mobile switch to 4:3.
-          Min/max clamps so it never looks weird.
+          Hero slides under the fixed transparent header.
+          negative margin-top = exact spacer height → hero starts at y:0
+
+          Mobile aspect-ratio matches the shop banner slider exactly:
+          shop uses 140px → 4:3 at ~375px ≈ same proportions.
+          We use aspect-ratio so image is NEVER cropped — height is
+          computed from width automatically.
         */
         .kc-hero-wrap {
           position: relative;
           width: 100%;
           overflow: hidden;
-          /* ~21:9 wide cinematic ratio */
           aspect-ratio: 21 / 9;
-          background: #1a0a2e; /* deep purple fallback while image loads */
+          background: #1a0a2e;
+          margin-top: -56px;
         }
-        @media (max-width: 768px) {
-          .kc-hero-wrap {
-            /* 4:3 on mobile — taller so image is visible */
-            aspect-ratio: 4 / 3;
-          }
+        @media (min-width: 768px) {
+          .kc-hero-wrap { margin-top: -68px; }
         }
-        @media (max-width: 480px) {
-          .kc-hero-wrap { aspect-ratio: 3 / 2.8; }
+        /* Mobile: same ratio as shop banner slider (wider = less tall = no crop) */
+        @media (max-width: 767px) {
+          .kc-hero-wrap { aspect-ratio: 3 / 2; }
+        }
+        @media (max-width: 479px) {
+          .kc-hero-wrap { aspect-ratio: 4 / 3; }
         }
 
         /* Each slide fills the container absolutely */
@@ -187,7 +192,7 @@ export default function HeroBanner() {
             right: auto;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 85%;
+            width: 88%;
           }
         }
         .kc-slide-title {
@@ -195,37 +200,47 @@ export default function HeroBanner() {
           font-style: italic;
           font-weight: 700;
           color: #ffffff;
-          line-height: 1.0;
+          line-height: 1.05;
           letter-spacing: -0.01em;
-          font-size: clamp(2.8rem, 7vw, 6.5rem);
+          /* Desktop big, mobile comfortably smaller */
+          font-size: clamp(1.6rem, 5vw, 6.5rem);
           text-shadow: 0 2px 24px rgba(0,0,0,0.28);
+        }
+        @media (max-width: 479px) {
+          .kc-slide-title { font-size: clamp(1.4rem, 8vw, 2.2rem); }
         }
         .kc-slide-sub {
           font-family: Poppins, sans-serif;
           font-weight: 400;
           color: rgba(255,255,255,0.92);
-          letter-spacing: 0.20em;
+          letter-spacing: 0.16em;
           text-transform: uppercase;
-          font-size: clamp(0.58rem, 1.1vw, 0.82rem);
+          font-size: clamp(0.55rem, 1.1vw, 0.82rem);
           margin-top: 0.5em;
           text-shadow: 0 1px 8px rgba(0,0,0,0.35);
+        }
+        @media (max-width: 479px) {
+          .kc-slide-sub { font-size: 0.62rem; letter-spacing: 0.12em; }
         }
         .kc-explore-btn {
           pointer-events: auto;
           display: inline-block;
-          margin-top: 1.5em;
-          padding: 0.55em 2em;
+          margin-top: 1.2em;
+          padding: 0.5em 1.6em;
           border: 1.5px solid rgba(255,255,255,0.88);
           color: #ffffff;
           font-family: Poppins, sans-serif;
-          font-size: clamp(0.58rem, 0.9vw, 0.74rem);
+          font-size: clamp(0.52rem, 0.9vw, 0.74rem);
           font-weight: 500;
-          letter-spacing: 0.16em;
+          letter-spacing: 0.14em;
           text-transform: uppercase;
           background: transparent;
           cursor: pointer;
           transition: background 0.22s;
           text-decoration: none;
+        }
+        @media (max-width: 479px) {
+          .kc-explore-btn { font-size: 0.6rem; padding: 0.45em 1.3em; margin-top: 0.9em; }
         }
         .kc-explore-btn:hover { background: rgba(255,255,255,0.16); }
 
@@ -345,12 +360,12 @@ export default function HeroBanner() {
         </div>
       </section>
 
-      {/* ── MARQUEE STRIP ── */}
-      <div style={{ width: '100%', overflow: 'hidden', background: 'linear-gradient(90deg,#6B2D8B,#9B4DB5 50%,#6B2D8B)' }}>
-        <div style={{ padding: '10px 0' }}>
-          <div className="kc-marquee" style={{ display: 'flex', whiteSpace: 'nowrap' }}>
-            {[0, 1].map(rep => (
-              <span key={rep} style={{ display: 'flex', alignItems: 'center', flexShrink: 0 }}>
+      {/* ── MARQUEE STRIP — dark minimal theme ── */}
+      <div style={{ width:'100%', overflow:'hidden', background:'#141414' }}>
+        <div style={{ padding:'9px 0' }}>
+          <div className="kc-marquee" style={{ display:'flex', whiteSpace:'nowrap' }}>
+            {[0,1].map(rep => (
+              <span key={rep} style={{ display:'flex', alignItems:'center', flexShrink:0 }}>
                 {[
                   'Free Shipping on Orders Above ₹999',
                   'Cash on Delivery Available',
@@ -362,8 +377,13 @@ export default function HeroBanner() {
                   'Secure & Encrypted Checkout',
                 ].map((text, i) => (
                   <span key={`${rep}-${i}`}
-                    style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '0 28px', fontSize: '0.72rem', fontFamily: 'Poppins, sans-serif', fontWeight: 500, color: '#f3e8ff' }}>
-                    <span style={{ color: 'rgba(243,232,255,0.45)', fontSize: 7 }}>✦</span>
+                    style={{ display:'inline-flex', alignItems:'center', gap:6,
+                      padding:'0 24px', fontSize:'0.7rem',
+                      fontFamily:'Poppins, sans-serif', fontWeight:500,
+                      color:'rgba(255,255,255,0.70)',
+                      letterSpacing:'0.06em',
+                    }}>
+                    <span style={{ color:'rgba(255,255,255,0.25)', fontSize:6 }}>◆</span>
                     {text}
                   </span>
                 ))}

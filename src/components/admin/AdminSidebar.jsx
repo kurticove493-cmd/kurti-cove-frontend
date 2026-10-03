@@ -1,29 +1,50 @@
 'use client'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { FiPackage, FiShoppingBag, FiLogOut, FiHome, FiTag, FiStar } from 'react-icons/fi'
+import { usePathname } from 'next/navigation'
+import { Package, ShoppingBag, LogOut, Home, Tag, Star } from 'lucide-react'
 import { useDispatch } from 'react-redux'
 import { resetCart } from '../../redux/features/CartSlice'
 import API from '../../utils/Helper'
 import { useAdminUser } from './AdminGuard'
 
-const navLinks = [
-  { label: 'Products',      href: '/admin/products', icon: FiPackage },
-  { label: 'Orders',        href: '/admin/orders',   icon: FiShoppingBag },
-  { label: 'Festival Sale', href: '/admin/sale',     icon: FiTag },
-  { label: 'Reviews',       href: '/admin/reviews',  icon: FiStar },
+const INK  = '#141414'
+const MUTE = '#888'
+const RULE = '#2a2a2a'
+const WHT  = '#fff'
+
+const NAV = [
+  { label:'Products',      href:'/admin/products', Icon:Package     },
+  { label:'Orders',        href:'/admin/orders',   Icon:ShoppingBag },
+  { label:'Festival Sale', href:'/admin/sale',     Icon:Tag         },
+  { label:'Reviews',       href:'/admin/reviews',  Icon:Star        },
 ]
 
+const SIDEBAR_CSS = `
+  .adm-aside { scrollbar-width:none; }
+  .adm-aside::-webkit-scrollbar { display:none; }
+  .adm-nav-link {
+    display:flex; align-items:center; gap:10px;
+    padding:10px 14px;
+    font-family:Poppins,sans-serif; font-size:13px; font-weight:400;
+    color:${MUTE}; text-decoration:none; border-radius:0;
+    transition:color 0.15s, background 0.15s;
+    letter-spacing:0.02em;
+  }
+  .adm-nav-link:hover { color:${WHT}; background:rgba(255,255,255,0.06); }
+  .adm-nav-link.active { color:${WHT}; font-weight:600; background:rgba(255,255,255,0.10); }
+  .adm-nav-link.active::before {
+    content:''; position:absolute; left:0; top:50%; transform:translateY(-50%);
+    width:3px; height:22px; background:${WHT};
+  }
+`
+
 export default function AdminSidebar() {
-  const pathname = usePathname()
-  const router = useRouter()
-  const dispatch = useDispatch()
+  const pathname  = usePathname()
+  const dispatch  = useDispatch()
   const adminUser = useAdminUser()
 
   const handleLogout = async () => {
-    try {
-      await API.post('/user/logout')
-    } catch {}
+    try { await API.post('/user/logout') } catch {}
     localStorage.removeItem('kc_token')
     localStorage.removeItem('kc_user')
     document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT'
@@ -33,67 +54,91 @@ export default function AdminSidebar() {
   }
 
   return (
-    <aside className="w-64 min-h-screen bg-[#3B0764] text-white flex flex-col fixed left-0 top-0 z-30 shadow-xl">
-      {/* Logo */}
-      <div className="px-6 py-6 border-b border-[#6B21A8]">
-        <Link href="/" className="flex items-center gap-2 group">
-          <span className="text-2xl">🌸</span>
-          <span className="font-cursive text-xl font-bold text-white group-hover:text-[#C084FC] transition-colors">
-            Kurti Cove
-          </span>
-        </Link>
-        <p className="font-sans text-xs text-[#C084FC] mt-1 ml-8">Admin Panel</p>
-      </div>
+    <>
+      <style>{SIDEBAR_CSS}</style>
+      <aside className="adm-aside" style={{
+        width:240, minHeight:'100vh', background:INK,
+        display:'flex', flexDirection:'column',
+        position:'fixed', left:0, top:0, zIndex:30,
+        borderRight:`1px solid ${RULE}`,
+      }}>
 
-      {/* Admin User */}
-      {adminUser && (
-        <div className="px-6 py-4 border-b border-[#6B21A8]">
-          <div className="w-10 h-10 rounded-full bg-[#A855F7] flex items-center justify-center text-white font-serif font-bold text-lg mb-2">
-            {adminUser.name?.[0]?.toUpperCase()}
-          </div>
-          <p className="font-sans text-sm font-semibold text-white truncate">{adminUser.name}</p>
-          <p className="font-sans text-xs text-[#C084FC] capitalize">{adminUser.role}</p>
+        {/* Brand */}
+        <div style={{ padding:'24px 20px 20px', borderBottom:`1px solid ${RULE}` }}>
+          <Link href="/admin/products" style={{ textDecoration:'none' }}>
+            <p style={{ fontFamily:'"Playfair Display",Georgia,serif', fontSize:18,
+              fontWeight:700, color:WHT, margin:0, lineHeight:1.2 }}>
+              Kurti Cove
+            </p>
+          </Link>
+          <p style={{ fontFamily:'Poppins,sans-serif', fontSize:10, fontWeight:500,
+            letterSpacing:'0.16em', textTransform:'uppercase', color:MUTE,
+            marginTop:4, marginBottom:0 }}>
+            Admin Panel
+          </p>
         </div>
-      )}
 
-      {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-1">
-        {navLinks.map(({ label, href, icon: Icon }) => {
-          const active = pathname.startsWith(href)
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={`flex items-center gap-3 px-4 py-3 rounded-xl font-sans text-sm font-medium transition-all duration-200 ${
-                active
-                  ? 'bg-[#A855F7] text-white shadow-lg'
-                  : 'text-[#C084FC] hover:bg-[#6B21A8] hover:text-white'
-              }`}
-            >
-              <Icon size={18} />
-              {label}
-            </Link>
-          )
-        })}
-      </nav>
+        {/* User */}
+        {adminUser && (
+          <div style={{ padding:'16px 20px', borderBottom:`1px solid ${RULE}`,
+            display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:36, height:36, borderRadius:'50%',
+              background:'rgba(255,255,255,0.10)',
+              display:'flex', alignItems:'center', justifyContent:'center',
+              fontFamily:'Poppins,sans-serif', fontSize:14, fontWeight:600, color:WHT,
+              flexShrink:0 }}>
+              {adminUser.name?.[0]?.toUpperCase()}
+            </div>
+            <div style={{ minWidth:0 }}>
+              <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13, fontWeight:500,
+                color:WHT, margin:0, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+                {adminUser.name}
+              </p>
+              <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE,
+                margin:0, textTransform:'capitalize' }}>
+                {adminUser.role}
+              </p>
+            </div>
+          </div>
+        )}
 
-      {/* Bottom actions */}
-      <div className="px-4 py-4 border-t border-[#6B21A8] space-y-1">
-        <Link
-          href="/"
-          className="flex items-center gap-3 px-4 py-3 rounded-xl font-sans text-sm text-[#C084FC] hover:bg-[#6B21A8] hover:text-white transition-all"
-        >
-          <FiHome size={18} />
-          View Store
-        </Link>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-3 rounded-xl font-sans text-sm text-red-400 hover:bg-red-900/30 hover:text-red-300 transition-all"
-        >
-          <FiLogOut size={18} />
-          Logout
-        </button>
-      </div>
-    </aside>
+        {/* Nav */}
+        <nav style={{ flex:1, padding:'16px 0', overflowY:'auto' }}>
+          {NAV.map(({ label, href, Icon }) => {
+            const active = pathname.startsWith(href)
+            return (
+              <div key={href} style={{ position:'relative' }}>
+                <Link href={href} className={`adm-nav-link${active?' active':''}`}>
+                  <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink:0 }} />
+                  {label}
+                </Link>
+              </div>
+            )
+          })}
+        </nav>
+
+        {/* Bottom */}
+        <div style={{ padding:'12px 0', borderTop:`1px solid ${RULE}` }}>
+          <Link href="/" className="adm-nav-link">
+            <Home size={16} strokeWidth={1.8} style={{ flexShrink:0 }} />
+            View Store
+          </Link>
+          <button onClick={handleLogout} style={{
+            display:'flex', alignItems:'center', gap:10,
+            width:'100%', padding:'10px 14px',
+            fontFamily:'Poppins,sans-serif', fontSize:13,
+            color:'#ef4444', background:'none', border:'none', cursor:'pointer',
+            transition:'color 0.15s, background 0.15s', borderRadius:0,
+          }}
+            onMouseEnter={e => e.currentTarget.style.background = 'rgba(239,68,68,0.08)'}
+            onMouseLeave={e => e.currentTarget.style.background = 'none'}
+          >
+            <LogOut size={16} strokeWidth={1.8} style={{ flexShrink:0 }} />
+            Logout
+          </button>
+        </div>
+
+      </aside>
+    </>
   )
 }

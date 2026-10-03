@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { FiArrowRight } from 'react-icons/fi'
 import ProductCard from './ProductCard'
 import { markDataReady } from './Preloader'
+import { staticImg } from '../../lib/staticImg.js'
 
 const BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/'
 
@@ -85,7 +86,7 @@ export default function NewArrivals({ initialData }) {
 
   return (
     <section className="relative py-14 px-4 md:px-8 overflow-hidden"
-      style={{ backgroundImage: 'url(/bg%20image/newarrival.jpg)', backgroundSize: 'cover', backgroundPosition: 'center top' }}>
+      style={{ backgroundImage: `url(${staticImg('/bg image/newarrival.jpg')})`, backgroundSize: 'cover', backgroundPosition: 'center top' }}>
       <div className="absolute inset-0 pointer-events-none" style={{ background: 'rgba(255,255,255,0.91)' }} aria-hidden="true" />
       <div className="relative z-10 max-w-7xl mx-auto">
         <div className="flex items-end justify-between mb-3">

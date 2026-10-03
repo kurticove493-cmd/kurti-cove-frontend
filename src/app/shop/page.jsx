@@ -1,270 +1,241 @@
 'use client'
 /*
-  ROOT CAUSE FIX — filter sync bug
-  ─────────────────────────────────────────────────────────────
-  OLD BUG: `filters` was a useState object initialised once at
-  mount from searchParams ([] dep array). Next.js client-side
-  navigation never remounts the page, so header links like
-  ?filter=isNewArrival changed the URL but the stale `filters`
-  state was never updated — fetchProducts fired with the old values.
-  `userInteracted` ref then permanently blocked any URL re-read.
-
-  FIX: URL is the SINGLE source of truth.
-  • `filters` state is eliminated entirely.
-  • Every filter value is derived directly from `searchParams`
-    (a stable Next.js hook that re-renders the component when
-    the URL changes, including client-side navigation).
-  • `fetchProducts` depends on a stable query-string key built
-    from searchParams — any URL change (header links, sidebar,
-    browser back/forward, direct load, refresh) triggers a new
-    fetch automatically with zero manual sync code.
-  • User interactions call `updateFilter`, which uses
-    router.replace to write back to the URL — the resulting
-    searchParams change re-renders and re-fetches.
-  • clearFilters replaces to /shop (no params) — products reset.
-  ─────────────────────────────────────────────────────────────
+  SHOP PAGE — Libas-style redesign v3 (complete, clean)
+  ─────────────────────────────────────────────────────
+  URL = single source of truth. All API/filter/URL logic
+  preserved exactly. Presentation only is restyled.
 */
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import Link from 'next/link'
 import {
-  Search, X, Filter, Tag, ChevronDown, ChevronRight,
-  SlidersHorizontal, ChevronLeft, Ruler, Check, IndianRupee,
+  Search, X, ChevronDown, ChevronLeft, ChevronRight,
+  SlidersHorizontal, Check, ArrowUpDown,
 } from 'lucide-react'
 import ProductCard from '../../components/user/ProductCard'
+import { staticImg } from '../../lib/staticImg.js'
 
-/* ─── Palette ─── */
-const ROSE     = '#E05C88'
-const BERRY    = '#7B2447'
-const MAUVE    = '#6B4553'
-const PINK     = '#F8A5B5'
-const PEACH    = '#FBDBBB'
-const BORDER   = '#F5C8D4'
-const PEACH_LT = '#FEF0E3'
-const WHITE    = '#FFFFFF'
+/* ── Palette ── */
+const INK  = '#141414'
+const MUTE = '#888'
+const ROSE = '#E05C88'
+const RULE = '#e8e8e8'
+const WHT  = '#ffffff'
 
 const SIZES = ['XS', 'S', 'M', 'L', 'XL', 'XXL']
 const BASE  = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000/api/'
 
-const SORT_OPTIONS = [
-  { label: 'Newest First',       value: ''     },
-  { label: 'Price: Low to High', value: 'asc'  },
-  { label: 'Price: High to Low', value: 'desc' },
+/* Sort: price only — Newest/BestSellers live in COLLECTION accordion */
+const SORT_OPTS = [
+  { label: 'Price: Low → High', value: 'asc'  },
+  { label: 'Price: High → Low', value: 'desc' },
 ]
 
-/* ═══ SHOP BANNER SLIDER ═══
-   3 slides from /shop-banner/ — no overlays, no dots, smooth crossfade.
-   Root causes fixed:
-   1. lazy loading on hidden slides prevented browser from downloading
-      images 2 & 3 (opacity:0 = not visible = skipped by lazy loader).
-      Fix: all 3 images load eagerly (they're small WebP, ~130KB each).
-   2. Crossfade: all slides stay at the same zIndex while transitioning
-      so the outgoing slide remains visible during the opacity fade.
-      Only AFTER the transition finishes does the inactive slide drop to z:0.
-   3. Auto-play uses useCallback + useRef so startTimer is stable across
-      renders and never creates ghost intervals.
-════════════════════════════════════════════════════════════════════ */
-const SHOP_BANNERS = [
-  { src: '/shop-banner/image1.webp', alt: 'Kurti Cove Shop Banner 1' },
-  { src: '/shop-banner/image2.webp', alt: 'Kurti Cove Shop Banner 2' },
-  { src: '/shop-banner/image3.webp', alt: 'Kurti Cove Shop Banner 3' },
+/* Collection options reuse the same ?filter= param as header nav */
+const COLL_OPTS = [
+  { label: 'New Arrivals', value: 'isNewArrival' },
+  { label: 'Best Sellers', value: 'isBestSeller' },
+  { label: 'On Sale',      value: 'onSale'       },
 ]
 
-function PromoBannerSlider() {
-  const [current,  setCurrent]  = useState(0)
-  const [previous, setPrevious] = useState(null)   // track outgoing slide for z-index
-  const timerRef = useRef(null)
-  const total    = SHOP_BANNERS.length
+/* ── Global shop-page CSS (scoped by .sp prefix) ── */
+const SHOP_CSS = `
+  .sp { background:#fff; min-height:100vh; }
+  .sp *,.sp *::before,.sp *::after { box-sizing:border-box; }
 
-  const startTimer = useCallback(() => {
-    clearInterval(timerRef.current)
-    timerRef.current = setInterval(() =>
-      setCurrent(c => (c + 1) % total)
-    , 4200)
-  }, [total])
+  /* sidebar: hidden <768, visible >=768 */
+  .sp-aside {
+    display:none;
+    width:230px; flex-shrink:0;
+    position:sticky; top:84px;
+    max-height:calc(100vh - 100px);
+    overflow-y:auto; overflow-x:hidden;
+    scrollbar-width:none;
+    padding:24px 24px 24px 0;
+    border-right:1px solid ${RULE};
+  }
+  .sp-aside::-webkit-scrollbar { display:none; }
+  @media (min-width:768px) { .sp-aside { display:block; } }
 
-  useEffect(() => {
-    startTimer()
-    return () => clearInterval(timerRef.current)
-  }, [startTimer])
+  /* mobile filter button: only <768 */
+  .sp-mob-filter { display:inline-flex; }
+  @media (min-width:768px) { .sp-mob-filter { display:none !important; } }
 
-  const goTo = useCallback((idx) => {
-    const next = ((idx % total) + total) % total
-    setCurrent(prev => { setPrevious(prev); return next })
-    startTimer()
-  }, [total, startTimer])
+  /* right content column */
+  .sp-content { flex:1; min-width:0; padding-top:24px; }
+  @media (min-width:768px) { .sp-content { padding-left:32px; } }
 
-  const goNext = useCallback(() => goTo(current + 1), [current, goTo])
-  const goPrev = useCallback(() => goTo(current - 1), [current, goTo])
+  /* product grid */
+  .sp-grid { display:grid; grid-template-columns:repeat(2,1fr); gap:10px; }
+  @media (min-width:480px) { .sp-grid { gap:14px; } }
+  @media (min-width:640px) { .sp-grid { grid-template-columns:repeat(3,1fr); gap:16px; } }
+  @media (min-width:1280px){ .sp-grid { grid-template-columns:repeat(4,1fr); gap:18px; } }
+
+  /* mobile drawer */
+  .sp-backdrop {
+    position:fixed; inset:0; z-index:40;
+    background:rgba(0,0,0,0.32);
+    transition:opacity 0.26s;
+  }
+  .sp-drawer {
+    position:fixed; top:0; left:0; bottom:0; z-index:50;
+    width:300px; max-width:90vw;
+    background:${WHT};
+    box-shadow:4px 0 28px rgba(0,0,0,0.12);
+    transition:transform 0.3s cubic-bezier(0.4,0,0.2,1);
+    display:flex; flex-direction:column; overflow:hidden;
+  }
+
+  /* hairline */
+  .sp-hr { border:none; border-top:1px solid ${RULE}; margin:0; }
+
+  /* pagination */
+  .sp-page-btn {
+    display:inline-flex; align-items:center; gap:4px;
+    padding:8px 20px;
+    font-family:Poppins,sans-serif; font-size:11px;
+    font-weight:500; letter-spacing:0.08em; text-transform:uppercase;
+    color:${INK}; background:none; border:1px solid ${RULE}; cursor:pointer;
+    transition:border-color 0.15s;
+  }
+  .sp-page-btn:hover:not(:disabled) { border-color:${INK}; }
+  .sp-page-btn:disabled { opacity:0.35; cursor:not-allowed; }
+
+  /* banner slider */
+  .sb-wrap { position:relative; width:100%; overflow:hidden; height:140px; }
+  @media (min-width:480px) { .sb-wrap { height:180px; } }
+  @media (min-width:640px) { .sb-wrap { height:220px; border-radius:8px; } }
+  @media (min-width:768px) { .sb-wrap { height:260px; border-radius:10px; } }
+  @media (min-width:1024px){ .sb-wrap { height:300px; border-radius:10px; } }
+  .sb-slide { position:absolute; inset:0; transition:opacity 0.75s ease; }
+  .sb-slide img {
+    width:100%; height:100%; object-fit:cover; display:block;
+    transition:transform 0.75s ease;
+  }
+  .sb-slide.entering img { transform:scale(1.025); }
+  .sb-slide.active   img { transform:scale(1.0); }
+  /* NO bottom-fade ::after */
+  .sb-btn {
+    position:absolute; top:50%; transform:translateY(-50%);
+    z-index:20; display:flex; align-items:center; justify-content:center;
+    width:30px; height:30px; border-radius:50%;
+    background:rgba(255,255,255,0.82);
+    border:1px solid rgba(0,0,0,0.08);
+    box-shadow:0 1px 5px rgba(0,0,0,0.10);
+    color:${INK}; cursor:pointer; backdrop-filter:blur(4px);
+    transition:background 0.18s, transform 0.18s;
+  }
+  .sb-btn:hover { background:#fff; transform:translateY(-50%) scale(1.1); }
+
+  /* accordion */
+  .acc-body {
+    overflow:hidden;
+    transition:max-height 0.3s ease;
+  }
+`
+
+/* ═══════════════════════════════════════════
+   BANNER SLIDER  (no bottom fade)
+═══════════════════════════════════════════ */
+const BANNERS = [
+  { src: staticImg('/shop-banner/image1.webp'), alt: 'Shop Banner 1' },
+  { src: staticImg('/shop-banner/image2.webp'), alt: 'Shop Banner 2' },
+  { src: staticImg('/shop-banner/image3.webp'), alt: 'Shop Banner 3' },
+]
+
+function BannerSlider() {
+  const [cur, setCur] = useState(0)
+  const [prv, setPrv] = useState(null)
+  const tmr = useRef(null)
+  const tot = BANNERS.length
+
+  const tick = useCallback(() => {
+    clearInterval(tmr.current)
+    tmr.current = setInterval(() => setCur(c => (c + 1) % tot), 4200)
+  }, [tot])
+
+  useEffect(() => { tick(); return () => clearInterval(tmr.current) }, [tick])
+
+  const go = useCallback((i) => {
+    const n = ((i % tot) + tot) % tot
+    setCur(p => { setPrv(p); return n })
+    tick()
+  }, [tot, tick])
 
   return (
-    <>
-      <style>{`
-        .shop-banner-wrap {
-          position: relative;
-          width: 100%;
-          overflow: hidden;
-          border-radius: 0;
-          height: 160px;
-        }
-        @media (min-width: 480px)  { .shop-banner-wrap { height: 200px; } }
-        @media (min-width: 640px)  { .shop-banner-wrap { height: 240px; border-radius: 16px; } }
-        @media (min-width: 768px)  { .shop-banner-wrap { height: 300px; border-radius: 20px; } }
-        @media (min-width: 1024px) { .shop-banner-wrap { height: 360px; border-radius: 20px; } }
-
-        /* Crossfade: all slides absolutely stacked; opacity drives visibility */
-        .shop-slide {
-          position: absolute;
-          inset: 0;
-          transition: opacity 0.75s ease;
-        }
-        .shop-slide img {
-          width: 100%;
-          height: 100%;
-          object-fit: cover;
-          object-position: center;
-          display: block;
-          /* subtle scale settle on entering slide */
-          transition: transform 0.75s ease;
-        }
-        .shop-slide.entering img  { transform: scale(1.02); }
-        .shop-slide.active   img  { transform: scale(1.0);  }
-
-        /* Glassy edge arrows */
-        .shop-arrow {
-          position: absolute;
-          top: 50%;
-          transform: translateY(-50%);
-          z-index: 30;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          border-radius: 50%;
-          cursor: pointer;
-          width: 36px; height: 36px;
-          background: rgba(255,255,255,0.82);
-          border: 1.5px solid rgba(123,36,71,0.20);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.12);
-          color: #7B2447;
-          backdrop-filter: blur(6px);
-          -webkit-backdrop-filter: blur(6px);
-          transition: transform 0.18s ease, background 0.18s ease,
-                      box-shadow 0.18s ease, color 0.18s ease;
-        }
-        .shop-arrow:hover {
-          background: rgba(255,255,255,0.97);
-          box-shadow: 0 3px 14px rgba(224,92,136,0.28);
-          transform: translateY(-50%) scale(1.1);
-          color: #E05C88;
-        }
-        @media (max-width: 479px) {
-          .shop-arrow { width: 28px; height: 28px; }
-        }
-
-        /*
-          Bottom fade overlay — sits above slide images (z:5) but below arrows (z:30).
-          Dissolves the banner's bottom edge into the white page background.
-          pointer-events:none so it never blocks slide clicks.
-        */
-        .shop-banner-wrap::after {
-          content: '';
-          position: absolute;
-          left: 0; right: 0; bottom: 0;
-          height: 22%;
-          background: linear-gradient(to top, #FFFFFF 0%, rgba(255,255,255,0) 100%);
-          pointer-events: none;
-          z-index: 5;
-        }
-      `}</style>
-
-      <div className="shop-banner-wrap">
-
-        {SHOP_BANNERS.map((b, i) => {
-          const isActive   = i === current
-          const isOutgoing = i === previous
-
-          return (
-            <div
-              key={b.src}
-              className={`shop-slide ${isActive ? 'active' : isOutgoing ? 'entering' : ''}`}
-              style={{
-                opacity: isActive ? 1 : 0,
-                /*
-                  During a transition both active (z:2) and outgoing (z:1)
-                  slides are visible so the fade plays properly.
-                  All others stay at z:0 (invisible).
-                */
-                zIndex: isActive ? 2 : isOutgoing ? 1 : 0,
-                pointerEvents: isActive ? 'auto' : 'none',
-              }}
-              aria-hidden={!isActive}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={b.src}
-                alt={b.alt}
-                /*
-                  ALL slides load eagerly — lazy loading skips images
-                  with opacity:0 (treated as not-visible by the browser),
-                  so slides 2 & 3 would never download. At ~130KB each
-                  eager loading is cheap and ensures they're ready.
-                */
-                loading="eager"
-                decoding="async"
-                fetchPriority={i === 0 ? 'high' : 'auto'}
-                draggable={false}
-                width={1500}
-                height={650}
-              />
-            </div>
-          )
-        })}
-
-        {/* Left arrow */}
-        <button onClick={goPrev} aria-label="Previous slide" className="shop-arrow" style={{ left: '10px' }}>
-          <ChevronLeft size={16} strokeWidth={2} />
-        </button>
-
-        {/* Right arrow */}
-        <button onClick={goNext} aria-label="Next slide" className="shop-arrow" style={{ right: '10px' }}>
-          <ChevronRight size={16} strokeWidth={2} />
-        </button>
-
-        {/* No dots */}
-      </div>
-    </>
+    <div className="sb-wrap">
+      {BANNERS.map((b, i) => (
+        <div key={b.src}
+          className={`sb-slide${i === cur ? ' active' : i === prv ? ' entering' : ''}`}
+          style={{ opacity: i === cur ? 1 : 0, zIndex: i === cur ? 2 : i === prv ? 1 : 0, pointerEvents: i === cur ? 'auto' : 'none' }}
+          aria-hidden={i !== cur}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={b.src} alt={b.alt} loading="eager" decoding="async"
+            fetchPriority={i === 0 ? 'high' : 'auto'} draggable={false} width={1500} height={650} />
+        </div>
+      ))}
+      <button className="sb-btn" onClick={() => go(cur - 1)} aria-label="Prev" style={{ left: 10 }}>
+        <ChevronLeft size={13} strokeWidth={2} />
+      </button>
+      <button className="sb-btn" onClick={() => go(cur + 1)} aria-label="Next" style={{ right: 10 }}>
+        <ChevronRight size={13} strokeWidth={2} />
+      </button>
+    </div>
   )
 }
 
-/* ═══ SORT DROPDOWN ═══ */
-function SortDropdown({ value, onChange }) {
+/* ═══════════════════════════════════════════
+   SORT CONTROL  (price options only)
+═══════════════════════════════════════════ */
+function SortControl({ value, onChange }) {
   const [open, setOpen] = useState(false)
-  const ref             = useRef(null)
-  const current         = SORT_OPTIONS.find((o) => o.value === value) || SORT_OPTIONS[0]
+  const ref = useRef(null)
+  const cur = SORT_OPTS.find(o => o.value === value)
 
   useEffect(() => {
-    const h = (e) => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
   return (
-    <div ref={ref} className="relative">
-      <button onClick={() => setOpen((v) => !v)}
-        className="inline-flex items-center gap-1.5 border rounded-xl px-2.5 py-1.5 md:px-3.5 md:py-2 text-[11px] md:text-xs font-semibold font-sans transition-all bg-white"
-        style={{ borderColor: open ? ROSE : BORDER, color: open ? ROSE : BERRY, boxShadow: open ? `0 0 0 2px ${ROSE}22` : 'none' }}>
-        <SlidersHorizontal size={11} strokeWidth={2} />
-        <span>{current.label}</span>
-        <ChevronDown size={11} strokeWidth={2.5} className={`transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+    <div ref={ref} style={{ position: 'relative', flexShrink: 0 }}>
+      <button onClick={() => setOpen(v => !v)} style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontFamily: 'Poppins,sans-serif', fontSize: 11, fontWeight: 500,
+        letterSpacing: '0.10em', textTransform: 'uppercase',
+        color: open ? ROSE : INK, background: 'none', border: 'none', cursor: 'pointer',
+      }}>
+        <ArrowUpDown size={12} strokeWidth={1.8} />
+        <span style={{ color: MUTE }}>Sort</span>
+        {cur ? <span>{cur.label}</span> : <span>Default</span>}
+        <ChevronDown size={11} strokeWidth={2}
+          style={{ transition: 'transform 0.2s', transform: open ? 'rotate(180deg)' : 'none' }} />
       </button>
       {open && (
-        <div className="absolute right-0 top-full mt-1.5 z-30 bg-white rounded-xl shadow-xl min-w-[180px] overflow-hidden"
-          style={{ border: `1px solid ${BORDER}` }}>
-          {SORT_OPTIONS.map((opt) => (
-            <button key={opt.value} onClick={() => { onChange(opt.value); setOpen(false) }}
-              className="w-full text-left px-4 py-2.5 text-xs font-sans transition-colors"
-              style={{ background: opt.value === value ? PEACH_LT : WHITE, color: opt.value === value ? ROSE : BERRY, fontWeight: opt.value === value ? 600 : 400 }}>
-              {opt.label}
+        <div style={{
+          position: 'absolute', right: 0, top: 'calc(100% + 6px)',
+          background: WHT, minWidth: 200,
+          border: `1px solid ${RULE}`,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.09)', zIndex: 40,
+        }}>
+          <button onClick={() => { onChange(''); setOpen(false) }} style={{
+            display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
+            fontFamily: 'Poppins,sans-serif', fontSize: 11, letterSpacing: '0.08em',
+            textTransform: 'uppercase', fontWeight: !value ? 600 : 400,
+            color: !value ? ROSE : INK, background: 'none', border: 'none',
+            cursor: 'pointer', borderBottom: `1px solid ${RULE}`,
+          }}>
+            Default
+          </button>
+          {SORT_OPTS.map(o => (
+            <button key={o.value} onClick={() => { onChange(o.value); setOpen(false) }} style={{
+              display: 'block', width: '100%', textAlign: 'left', padding: '10px 16px',
+              fontFamily: 'Poppins,sans-serif', fontSize: 11, letterSpacing: '0.08em',
+              textTransform: 'uppercase', fontWeight: o.value === value ? 600 : 400,
+              color: o.value === value ? ROSE : INK, background: 'none', border: 'none',
+              cursor: 'pointer', borderBottom: `1px solid ${RULE}`,
+            }}>
+              {o.label}
             </button>
           ))}
         </div>
@@ -273,241 +244,310 @@ function SortDropdown({ value, onChange }) {
   )
 }
 
-/* ═══ CATEGORY PILLS ═══ */
-function CategoryPills({ activeCategory, onSelect }) {
-  const [categories, setCategories] = useState([])
-  const [loading,    setLoading]    = useState(true)
-
-  useEffect(() => {
-    fetch(`${BASE}product/categories`).then((r) => r.json())
-      .then((d) => { if (d.success) setCategories(d.data) }).catch(() => {}).finally(() => setLoading(false))
-  }, [])
-
-  if (loading) return (
-    <div className="flex gap-2 overflow-x-hidden pb-1">
-      {Array.from({ length: 5 }).map((_, i) => (
-        <div key={i} className="h-8 w-24 rounded-full animate-pulse flex-shrink-0" style={{ background: PEACH_LT }} />
-      ))}
-    </div>
-  )
-  if (categories.length === 0) return null
-
+/* ═══════════════════════════════════════════
+   ACCORDION
+═══════════════════════════════════════════ */
+function Accordion({ label, open: controlledOpen, onToggle, children }) {
   return (
-    <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-hide snap-x" style={{ scrollbarWidth: 'none' }}>
-      <button onClick={() => onSelect('')}
-        className="flex-shrink-0 snap-start inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200"
-        style={!activeCategory ? { background: ROSE, borderColor: ROSE, color: '#fff', boxShadow: `0 2px 8px ${ROSE}44` } : { background: WHITE, borderColor: BORDER, color: BERRY }}>
-        All
+    <div style={{ borderBottom: `1px solid ${RULE}` }}>
+      <button onClick={onToggle} style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        width: '100%', padding: '14px 0',
+        background: 'none', border: 'none', cursor: 'pointer',
+      }}>
+        <span style={{
+          fontFamily: 'Poppins,sans-serif', fontSize: 14, fontWeight: 600,
+          letterSpacing: '0.12em', textTransform: 'uppercase', color: INK,
+        }}>
+          {label}
+        </span>
+        <ChevronDown size={14} strokeWidth={2} color={MUTE}
+          style={{ transition: 'transform 0.22s', transform: controlledOpen ? 'rotate(180deg)' : 'none', flexShrink: 0 }} />
       </button>
-      {categories.map(({ name, count }) => (
-        <button key={name} onClick={() => onSelect(name === activeCategory ? '' : name)}
-          className="flex-shrink-0 snap-start inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-semibold border transition-all duration-200 whitespace-nowrap"
-          style={activeCategory === name ? { background: ROSE, borderColor: ROSE, color: '#fff', boxShadow: `0 2px 8px ${ROSE}44` } : { background: WHITE, borderColor: BORDER, color: BERRY }}>
-          <Tag size={11} />
-          {name}
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full font-normal"
-            style={activeCategory === name ? { background: 'rgba(255,255,255,0.25)', color: '#fff' } : { background: PEACH_LT, color: MAUVE }}>
-            {count}
-          </span>
-        </button>
-      ))}
+      <div className="acc-body" style={{ maxHeight: controlledOpen ? 800 : 0 }}>
+        <div style={{ paddingBottom: 16 }}>{children}</div>
+      </div>
     </div>
   )
 }
 
-/* ═══ FILTER SIDEBAR ═══ */
-function FilterSidebar({ filters, updateFilter, clearFilters, hasActiveFilters, onClose, isDrawer }) {
-  /* Local controlled states for inputs that debounce or need Apply */
-  const [searchInput,   setSearchInput]   = useState(filters.search)
-  const [minPriceInput, setMinPriceInput] = useState(filters.minPrice)
-  const [maxPriceInput, setMaxPriceInput] = useState(filters.maxPrice)
-  const [categories,    setCategories]    = useState([])
-  const searchDebounce = useRef(null)
+/* Square checkbox row */
+function CheckRow({ label, count, checked, onChange }) {
+  return (
+    <label onClick={onChange} style={{
+      display: 'flex', alignItems: 'center', gap: 10,
+      padding: '6px 0', cursor: 'pointer',
+    }}>
+      <span style={{
+        width: 15, height: 15, flexShrink: 0,
+        border: `1.5px solid ${checked ? ROSE : '#c8c8c8'}`,
+        background: checked ? ROSE : WHT,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        transition: 'background 0.15s, border-color 0.15s',
+      }}>
+        {checked && <Check size={9} color="#fff" strokeWidth={3} />}
+      </span>
+      <span style={{
+        fontFamily: 'Poppins,sans-serif', fontSize: 13,
+        color: checked ? INK : '#444', fontWeight: checked ? 500 : 400, flex: 1,
+      }}>
+        {label}
+      </span>
+      {count !== undefined && (
+        <span style={{ fontFamily: 'Poppins,sans-serif', fontSize: 11, color: MUTE }}>({count})</span>
+      )}
+    </label>
+  )
+}
 
-  /* Fetch categories once */
+/* ═══════════════════════════════════════════
+   FILTER SIDEBAR
+   Desktop: always-visible inline, no toggle
+   Mobile:  inside left-slide drawer only
+═══════════════════════════════════════════ */
+function FilterSidebar({ filters, updateFilter, clearFilters, hasActiveFilters, onClose, isDrawer }) {
+  const [searchVal,  setSearchVal]  = useState(filters.search)
+  const [minPx,      setMinPx]      = useState(filters.minPrice)
+  const [maxPx,      setMaxPx]      = useState(filters.maxPrice)
+  const [cats,       setCats]       = useState([])
+  const [moreCats,   setMoreCats]   = useState(false)
+  const debRef = useRef(null)
+
+  /* open states for each accordion */
+  const [openColl,  setOpenColl]  = useState(true)
+  const [openSize,  setOpenSize]  = useState(true)
+  const [openCat,   setOpenCat]   = useState(false)
+  const [openPrice, setOpenPrice] = useState(false)
+
   useEffect(() => {
-    fetch(`${BASE}product/categories`).then((r) => r.json())
-      .then((d) => { if (d.success) setCategories(d.data) }).catch(() => {})
+    fetch(`${BASE}product/categories`).then(r => r.json())
+      .then(d => { if (d.success) setCats(d.data) }).catch(() => {})
   }, [])
 
-  /*
-    Sync local inputs when filters change from OUTSIDE (URL navigation).
-    This is what makes sidebar controls reflect the URL when the user
-    clicks a header link.
-  */
-  useEffect(() => { setSearchInput(filters.search) },     [filters.search])
-  useEffect(() => { setMinPriceInput(filters.minPrice) }, [filters.minPrice])
-  useEffect(() => { setMaxPriceInput(filters.maxPrice) }, [filters.maxPrice])
+  useEffect(() => { setSearchVal(filters.search)   }, [filters.search])
+  useEffect(() => { setMinPx(filters.minPrice)     }, [filters.minPrice])
+  useEffect(() => { setMaxPx(filters.maxPrice)     }, [filters.maxPrice])
 
-  /* Debounced search */
+  /* debounced search → URL */
   useEffect(() => {
-    clearTimeout(searchDebounce.current)
-    searchDebounce.current = setTimeout(() => {
-      if (searchInput !== filters.search) updateFilter('search', searchInput)
-    }, 300)
-    return () => clearTimeout(searchDebounce.current)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchInput])
+    clearTimeout(debRef.current)
+    debRef.current = setTimeout(() => {
+      if (searchVal !== filters.search) updateFilter('search', searchVal)
+    }, 320)
+    return () => clearTimeout(debRef.current)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchVal])
 
   const applyPrice = () => {
-    updateFilter('minPrice', minPriceInput)
-    updateFilter('maxPrice', maxPriceInput)
+    updateFilter('minPrice', minPx)
+    updateFilter('maxPrice', maxPx)
   }
 
-  const SectionHead = ({ icon: Icon, text }) => (
-    <div className="flex items-center gap-1.5 mb-2">
-      <Icon size={11} strokeWidth={2.5} style={{ color: ROSE }} />
-      <p className="font-sans text-[10px] font-bold uppercase tracking-[0.18em] flex-1" style={{ color: BERRY }}>{text}</p>
-    </div>
-  )
-  const Divider = () => <div className="border-t my-3" style={{ borderColor: BORDER }} />
+  const visCats = moreCats ? cats : cats.slice(0, 6)
 
   return (
-    <div className={isDrawer ? 'h-full flex flex-col' : ''}>
-      {isDrawer && (
-        <div className="flex items-center justify-between px-5 py-4 border-b"
-          style={{ borderColor: BORDER, background: PEACH_LT }}>
-          <span className="font-bold text-base" style={{ fontFamily: 'var(--font-playfair), serif', color: BERRY }}>Filters</span>
-          <button onClick={onClose} className="p-1.5 rounded-full transition-colors" style={{ color: PINK }} aria-label="Close filters"><X size={18} /></button>
+    <div style={{ height: isDrawer ? '100%' : undefined, display: 'flex', flexDirection: 'column' }}>
+
+      {/* Header */}
+      <div style={{
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        padding: isDrawer ? '18px 20px 15px' : '0 0 15px',
+        borderBottom: `1px solid ${RULE}`, flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <SlidersHorizontal size={15} strokeWidth={1.8} color={INK} />
+          <span style={{
+            fontFamily: 'Poppins,sans-serif', fontSize: 15,
+            fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase', color: INK,
+          }}>
+            Filter
+          </span>
         </div>
-      )}
-      <div className={`px-3.5 py-3.5 ${isDrawer ? 'flex-1 overflow-y-auto' : ''}`}
-           style={isDrawer ? {} : { scrollbarWidth: 'none' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {hasActiveFilters && (
+            <button onClick={() => { clearFilters(); onClose?.() }} style={{
+              fontFamily: 'Poppins,sans-serif', fontSize: 11, letterSpacing: '0.08em',
+              textTransform: 'uppercase', color: ROSE, background: 'none', border: 'none', cursor: 'pointer',
+            }}>
+              Clear all
+            </button>
+          )}
+          {isDrawer && (
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTE, display: 'flex' }}>
+              <X size={18} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Scrollable body */}
+      <div style={{
+        flex: 1, overflowY: 'auto', overflowX: 'hidden', scrollbarWidth: 'none',
+        padding: isDrawer ? '0 20px 24px' : '0',
+      }}>
 
         {/* Search */}
-        <SectionHead icon={Search} text="Search" />
-        <div className="flex items-center gap-2 border rounded-xl px-3 py-2 transition-all" style={{ borderColor: BORDER, background: WHITE }}>
-          <Search size={11} className="flex-shrink-0" style={{ color: PINK }} />
-          <input type="text" value={searchInput} onChange={(e) => setSearchInput(e.target.value)}
-            placeholder="Search kurtis…" className="flex-1 text-xs bg-transparent outline-none font-sans" style={{ color: BERRY }} />
-          {searchInput && <button onClick={() => setSearchInput('')} style={{ color: PINK }}><X size={10} /></button>}
-        </div>
-
-        <Divider />
-
-        {/* Category */}
-        <SectionHead icon={Tag} text="Category" />
-        <div className="space-y-0.5">
-          <button
-            onClick={() => updateFilter('category', '')}
-            className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-sans font-medium transition-all flex items-center gap-2"
-            style={{ background: !filters.category ? ROSE : 'transparent', color: !filters.category ? '#fff' : BERRY }}>
-            <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 border"
-              style={!filters.category ? { background: '#fff', borderColor: '#fff' } : { borderColor: PINK }} />
-            All Categories
-          </button>
-          {categories.map(({ name }) => {
-            const active = filters.category === name
-            return (
-              <button key={name}
-                onClick={() => updateFilter('category', active ? '' : name)}
-                className="w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-sans font-medium transition-all flex items-center gap-2"
-                style={{ background: active ? ROSE : 'transparent', color: active ? '#fff' : BERRY }}>
-                <span className="w-1.5 h-1.5 rounded-full flex-shrink-0 border"
-                  style={active ? { background: '#fff', borderColor: '#fff' } : { borderColor: PINK }} />
-                <span className="truncate">{name}</span>
-              </button>
-            )
-          })}
-          {categories.length === 0 && (
-            <p className="text-[10px] font-sans px-2.5 py-1" style={{ color: PINK }}>Loading…</p>
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: 8,
+          border: `1px solid ${RULE}`, padding: '9px 12px', margin: '16px 0',
+        }}>
+          <Search size={13} color={MUTE} strokeWidth={1.8} />
+          <input type="text" value={searchVal} onChange={e => setSearchVal(e.target.value)}
+            placeholder="Search kurtis…" style={{
+              flex: 1, fontSize: 13, fontFamily: 'Poppins,sans-serif',
+              background: 'transparent', outline: 'none', border: 'none', color: INK,
+            }} />
+          {searchVal && (
+            <button onClick={() => setSearchVal('')} style={{ background: 'none', border: 'none', cursor: 'pointer', color: MUTE, display: 'flex' }}>
+              <X size={11} />
+            </button>
           )}
         </div>
 
-        <Divider />
-
-        {/* Price Range */}
-        <SectionHead icon={IndianRupee} text="Price Range" />
-        <div className="flex items-stretch gap-2 mb-2">
-          {[{ label: 'Min ₹', val: minPriceInput, set: setMinPriceInput, ph: '0' }, { label: 'Max ₹', val: maxPriceInput, set: setMaxPriceInput, ph: 'Any' }].map((f, idx) => (
-            <div key={idx} className="flex-1 border rounded-lg px-2.5 py-1.5" style={{ borderColor: BORDER, background: WHITE }}>
-              <p className="text-[9px] font-sans font-semibold uppercase tracking-wide mb-0.5" style={{ color: PINK }}>{f.label}</p>
-              <input type="number" min={0} value={f.val} placeholder={f.ph} onChange={(e) => f.set(e.target.value)} className="w-full text-xs bg-transparent outline-none font-sans" style={{ color: BERRY }} />
-            </div>
+        {/* COLLECTION */}
+        <Accordion label="Collection" open={openColl} onToggle={() => setOpenColl(v => !v)}>
+          {COLL_OPTS.map(o => (
+            <CheckRow key={o.value} label={o.label}
+              checked={filters.filter === o.value}
+              onChange={() => updateFilter('filter', filters.filter === o.value ? '' : o.value)}
+            />
           ))}
-        </div>
-        <button onClick={applyPrice} className="w-full flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs font-semibold font-sans transition-all active:scale-95 text-white" style={{ background: ROSE }}>
-          <Check size={11} strokeWidth={2.5} /> Apply
-        </button>
+        </Accordion>
 
-        <Divider />
-
-        {/* Size */}
-        <SectionHead icon={Ruler} text="Size" />
-        <div className="flex flex-wrap gap-1">
-          {SIZES.map((s) => (
-            <button key={s} onClick={() => updateFilter('size', filters.size === s ? '' : s)}
-              className="px-2.5 py-1 rounded-full border text-xs font-semibold font-sans transition-all"
-              style={filters.size === s ? { background: ROSE, borderColor: ROSE, color: '#fff' } : { background: WHITE, borderColor: BORDER, color: BERRY }}>
-              {s}
-            </button>
+        {/* SIZE */}
+        <Accordion label="Size" open={openSize} onToggle={() => setOpenSize(v => !v)}>
+          {SIZES.map(s => (
+            <CheckRow key={s} label={s}
+              checked={filters.size === s}
+              onChange={() => updateFilter('size', filters.size === s ? '' : s)}
+            />
           ))}
-        </div>
+        </Accordion>
 
-        {hasActiveFilters && (
-          <>
-            <Divider />
-            <button onClick={clearFilters} className="w-full border border-red-200 text-red-400 hover:bg-red-50 hover:text-red-600 py-2 rounded-lg text-xs font-semibold font-sans transition-colors">
-              Clear All Filters
+        {/* CATEGORY */}
+        <Accordion label="Category" open={openCat} onToggle={() => setOpenCat(v => !v)}>
+          {visCats.map(({ name, count }) => (
+            <CheckRow key={name} label={name} count={count}
+              checked={filters.category === name}
+              onChange={() => updateFilter('category', filters.category === name ? '' : name)}
+            />
+          ))}
+          {cats.length > 6 && (
+            <button onClick={() => setMoreCats(v => !v)} style={{
+              fontFamily: 'Poppins,sans-serif', fontSize: 12, color: ROSE,
+              background: 'none', border: 'none', cursor: 'pointer', padding: '6px 0', textDecoration: 'underline',
+            }}>
+              {moreCats ? 'Show less' : `Show ${cats.length - 6} more`}
             </button>
-          </>
-        )}
+          )}
+        </Accordion>
+
+        {/* PRICE */}
+        <Accordion label="Price" open={openPrice} onToggle={() => setOpenPrice(v => !v)}>
+          <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+            {[
+              { label: 'Min ₹', val: minPx, set: setMinPx, ph: '0'   },
+              { label: 'Max ₹', val: maxPx, set: setMaxPx, ph: 'Any' },
+            ].map((f, i) => (
+              <div key={i} style={{ flex: 1, border: `1px solid ${RULE}`, padding: '8px 10px' }}>
+                <p style={{ fontFamily: 'Poppins,sans-serif', fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.12em', color: MUTE, marginBottom: 4 }}>
+                  {f.label}
+                </p>
+                <input type="number" min={0} value={f.val} placeholder={f.ph}
+                  onChange={e => f.set(e.target.value)}
+                  style={{ width: '100%', fontSize: 13, fontFamily: 'Poppins,sans-serif', background: 'transparent', outline: 'none', border: 'none', color: INK }} />
+              </div>
+            ))}
+          </div>
+          <button onClick={applyPrice} style={{
+            width: '100%', padding: '9px 0',
+            fontFamily: 'Poppins,sans-serif', fontSize: 11, fontWeight: 600,
+            letterSpacing: '0.12em', textTransform: 'uppercase',
+            color: WHT, background: INK, border: 'none', cursor: 'pointer',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+          }}>
+            <Check size={11} strokeWidth={3} /> Apply
+          </button>
+        </Accordion>
+
       </div>
     </div>
   )
 }
 
-/* ═══ SKELETON CARD ═══ */
-function SkeletonCard() {
+/* ═══════════════════════════════════════════
+   SKELETON
+═══════════════════════════════════════════ */
+function Skel() {
   return (
-    <div className="bg-white rounded-2xl overflow-hidden animate-pulse" style={{ border: `1px solid ${BORDER}` }}>
-      <div className="aspect-[3/4] bg-gray-100" />
-      <div className="p-3.5 space-y-2">
-        <div className="h-4 rounded-full w-4/5 bg-gray-100" />
-        <div className="h-3 rounded-full w-1/2 bg-gray-100" />
-        <div className="h-4 rounded-full w-2/5 bg-gray-100" />
-        <div className="h-8 rounded-xl w-full bg-gray-100 mt-1" />
+    <div>
+      <div className="animate-pulse" style={{ aspectRatio: '3/4', background: '#f0f0f0', borderRadius: 6 }} />
+      <div style={{ paddingTop: 10 }}>
+        <div className="animate-pulse" style={{ height: 11, background: '#ebebeb', borderRadius: 2, marginBottom: 7, width: '80%' }} />
+        <div className="animate-pulse" style={{ height: 11, background: '#ebebeb', borderRadius: 2, width: '55%' }} />
       </div>
     </div>
   )
 }
 
-/* ═══════════════════════════════════════════════════════════════════
+/* ═══════════════════════════════════════════
+   ACTIVE CHIP
+═══════════════════════════════════════════ */
+function Chip({ label, onRemove }) {
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center', gap: 5,
+      border: `1px solid ${RULE}`, padding: '3px 10px',
+      fontFamily: 'Poppins,sans-serif', fontSize: 11,
+      letterSpacing: '0.06em', color: INK,
+    }}>
+      {label}
+      <button onClick={onRemove} style={{ background: 'none', border: 'none', cursor: 'pointer', display: 'flex', color: MUTE }}>
+        <X size={9} strokeWidth={2.5} />
+      </button>
+    </span>
+  )
+}
+
+/* ═══════════════════════════════════════════
+   PAGE HEADING
+═══════════════════════════════════════════ */
+function Heading({ filters }) {
+  let t = 'Shop All Kurtis', s = 'Handpicked ethnic wear for every occasion'
+  if      (filters.category)                  { t = filters.category;   s = `Explore our ${filters.category} collection` }
+  else if (filters.filter === 'isNewArrival') { t = 'New Arrivals';     s = 'Fresh styles, updated every week' }
+  else if (filters.filter === 'isBestSeller') { t = 'Best Sellers';     s = 'Loved by thousands of customers' }
+  else if (filters.filter === 'onSale')       { t = 'On Sale';          s = 'Curated deals — limited time' }
+  else if (filters.search)                    { t = `"${filters.search}"`; s = 'Search results' }
+  return (
+    <div style={{ marginBottom: 18 }}>
+      <h1 style={{
+        fontFamily: '"Playfair Display",Georgia,serif',
+        fontSize: 28, fontWeight: 700, color: INK,
+        letterSpacing: '-0.01em', lineHeight: 1.15, marginBottom: 5,
+      }}>
+        {t}
+      </h1>
+      <p style={{ fontFamily: 'Poppins,sans-serif', fontSize: 12, color: MUTE, letterSpacing: '0.04em' }}>
+        {s}
+      </p>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════
    MAIN SHOP CONTENT
-   ─────────────────────────────────────────────────────────────────
-   URL IS THE SINGLE SOURCE OF TRUTH.
-
-   `filters` is NOT a useState — it is derived on every render
-   directly from `searchParams`. Because Next.js re-renders this
-   component whenever searchParams changes (client nav, history,
-   router.replace), ALL transitions update the UI automatically:
-     • Header link click → URL changes → component re-renders →
-       filters updated → fetchProducts re-runs with new params
-     • Sidebar control → updateFilter → router.replace → URL changes
-       → same pipeline fires
-     • Direct URL load / refresh → Suspense boundary, component
-       mounts with correct searchParams already populated
-
-   `updateFilter` / `clearFilters` write ONLY to the URL.
-   The `filters` object computed from searchParams is passed down
-   to the sidebar so it always reflects the live URL state.
-═══════════════════════════════════════════════════════════════════ */
+═══════════════════════════════════════════ */
 function ShopContent() {
   const searchParams = useSearchParams()
   const router       = useRouter()
 
-  const [products,    setProducts]    = useState([])
-  const [loading,     setLoading]     = useState(true)
-  const [pagination,  setPagination]  = useState({ total: 0, pages: 1, page: 1 })
-  const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [products,   setProducts]   = useState([])
+  const [loading,    setLoading]    = useState(true)
+  const [pagination, setPagination] = useState({ total: 0, pages: 1, page: 1 })
+  const [drawerOpen, setDrawerOpen] = useState(false)
 
-  /*
-    ─── DERIVE FILTERS DIRECTLY FROM URL (no intermediate state) ───
-    This is the critical change. Previously these lived in useState
-    initialised once with [] deps. Now they are read on every render
-    from searchParams, so any URL change immediately produces the
-    correct filter values.
-  */
+  /* URL is single source of truth */
   const filters = {
     sort:     searchParams.get('sort')     ?? '',
     size:     searchParams.get('size')     ?? '',
@@ -519,11 +559,6 @@ function ShopContent() {
     page:     Number(searchParams.get('page')) || 1,
   }
 
-  /*
-    Build a stable query-string key from all filter values.
-    fetchProducts runs whenever this key changes — which happens
-    on EVERY URL change including header link clicks.
-  */
   const queryKey = [
     filters.sort, filters.size, filters.filter, filters.category,
     filters.search, filters.minPrice, filters.maxPrice, filters.page,
@@ -532,249 +567,225 @@ function ShopContent() {
   const fetchProducts = useCallback(async () => {
     setLoading(true)
     try {
-      const params = new URLSearchParams()
-      if (filters.sort)     params.set('sort',     filters.sort)
-      if (filters.size)     params.set('size',     filters.size)
-      if (filters.search)   params.set('search',   filters.search)
-      /*
-        Map ?filter=isNewArrival → ?isNewArrival=true for the API.
-        This was already correct — it was just never being reached
-        because filters.filter was always '' due to the stale state.
-      */
-      if (filters.filter)   params.set(filters.filter, 'true')
-      if (filters.category) params.set('category', filters.category)
-      if (filters.minPrice) params.set('minPrice', filters.minPrice)
-      if (filters.maxPrice) params.set('maxPrice', filters.maxPrice)
-      params.set('page',  String(filters.page))
-      params.set('limit', '20')
+      const p = new URLSearchParams()
+      if (filters.sort)     p.set('sort',          filters.sort)
+      if (filters.size)     p.set('size',          filters.size)
+      if (filters.search)   p.set('search',        filters.search)
+      if (filters.filter)   p.set(filters.filter,  'true')   /* isNewArrival=true etc */
+      if (filters.category) p.set('category',      filters.category)
+      if (filters.minPrice) p.set('minPrice',      filters.minPrice)
+      if (filters.maxPrice) p.set('maxPrice',      filters.maxPrice)
+      p.set('page',  String(filters.page))
+      p.set('limit', '20')
 
-      const res  = await fetch(`${BASE}product?${params}`, { cache: 'no-store' })
+      const res  = await fetch(`${BASE}product?${p}`, { cache: 'no-store' })
       const data = await res.json()
       if (data.success) {
-        setProducts(data.data)
-        setPagination(data.pagination)
+        setProducts(data.data ?? [])
+        setPagination(data.pagination ?? { total: 0, pages: 1, page: 1 })
+      } else {
+        setProducts([])
+        setPagination({ total: 0, pages: 1, page: 1 })
       }
-    } catch { setProducts([]) }
-    finally { setLoading(false) }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [queryKey])   /* ← depends on queryKey, not on the filters object */
+    } catch {
+      setProducts([])
+      setPagination({ total: 0, pages: 1, page: 1 })
+    } finally {
+      setLoading(false)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [queryKey])
 
-  /* Re-fetch whenever any URL param changes */
   useEffect(() => { fetchProducts() }, [fetchProducts])
 
-  /*
-    updateFilter — writes to URL only.
-    The resulting URL change re-renders ShopContent with new
-    searchParams → new filters object → new queryKey → new fetch.
-    Also resets page to 1 on every filter change.
-  */
   const updateFilter = useCallback((key, value) => {
-    const current = new URLSearchParams(searchParams.toString())
-    if (value) {
-      current.set(key, value)
-    } else {
-      current.delete(key)
-    }
-    /* Reset page when changing any filter */
-    current.delete('page')
-    const qs = current.toString()
+    const cur = new URLSearchParams(searchParams.toString())
+    if (value) { cur.set(key, value) } else { cur.delete(key) }
+    cur.delete('page')
+    const qs = cur.toString()
     router.replace(qs ? `/shop?${qs}` : '/shop', { scroll: false })
   }, [searchParams, router])
 
-  /*
-    clearFilters — navigates to bare /shop, clearing ALL params.
-    Produces an immediate re-render with empty filters → fetchAll.
-  */
   const clearFilters = useCallback(() => {
     router.replace('/shop', { scroll: false })
   }, [router])
 
-  const hasActiveFilters = !!(
+  const hasActive = !!(
     filters.sort || filters.size || filters.filter ||
     filters.search || filters.category || filters.minPrice || filters.maxPrice
   )
 
-  /* Pagination helpers — also write to URL */
-  const goToPage = useCallback((p) => {
-    const current = new URLSearchParams(searchParams.toString())
-    if (p > 1) { current.set('page', String(p)) } else { current.delete('page') }
-    const qs = current.toString()
+  const goPage = useCallback((p) => {
+    const cur = new URLSearchParams(searchParams.toString())
+    if (p > 1) { cur.set('page', String(p)) } else { cur.delete('page') }
+    const qs = cur.toString()
     router.replace(qs ? `/shop?${qs}` : '/shop', { scroll: false })
   }, [searchParams, router])
 
+  const sidebarProps = { filters, updateFilter, clearFilters, hasActiveFilters: hasActive }
+
   return (
-    <main className="min-h-screen bg-white">
+    <>
+      <style>{SHOP_CSS}</style>
 
-      <PromoBannerSlider />
+      <main className="sp">
+        <div style={{ maxWidth: 1440, margin: '0 auto', padding: '0 16px 56px' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start' }}>
 
-      <div className="h-5 bg-white" />
+            {/* ── DESKTOP SIDEBAR: always visible on ≥768, hidden below ── */}
+            <aside className="sp-aside">
+              <FilterSidebar {...sidebarProps} isDrawer={false} />
+            </aside>
 
-      {/* Category strip — sticky */}
-      <div className="border-b sticky top-[74px] md:top-[98px] z-20"
-        style={{ borderColor: BORDER, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)' }}>
-        <div className="w-full px-4 sm:px-6 py-3">
-          <CategoryPills activeCategory={filters.category} onSelect={(cat) => updateFilter('category', cat)} />
-        </div>
-      </div>
+            {/* ── RIGHT COLUMN ── */}
+            <div className="sp-content">
 
-      <div className="h-5 bg-white" />
+              {/* Heading */}
+              <Heading filters={filters} />
 
-      {/* Main layout */}
-      <div className="w-full px-4 sm:px-6 pb-12 flex gap-6 lg:gap-8 items-start">
-
-        {/* Desktop sidebar */}
-        <aside className="hidden lg:block flex-shrink-0 rounded-2xl overflow-hidden"
-          style={{
-            width: '268px',
-            position: 'sticky', top: '168px',
-            maxHeight: 'calc(100vh - 184px)',
-            overflowY: 'auto',
-            overflowX: 'hidden',
-            scrollbarWidth: 'none',
-            zIndex: 10,
-            background: WHITE,
-            border: `1px solid ${BORDER}`,
-            boxShadow: `0 4px 16px rgba(224,92,136,0.10)`,
-          }}>
-          <style>{`aside::-webkit-scrollbar{display:none}`}</style>
-          <FilterSidebar
-            filters={filters}
-            updateFilter={updateFilter}
-            clearFilters={clearFilters}
-            hasActiveFilters={hasActiveFilters}
-            isDrawer={false}
-          />
-        </aside>
-
-        {/* Product area */}
-        <div className="flex-1 min-w-0">
-
-          {/* Mobile: filter + sort */}
-          <div className="flex items-center justify-between mb-4 lg:hidden">
-            <button onClick={() => setSidebarOpen(true)}
-              className="flex items-center gap-2 bg-white border px-4 py-2 rounded-xl text-sm font-medium shadow-sm transition-colors"
-              style={{ borderColor: BORDER, color: BERRY }}>
-              <Filter size={14} /> Filters
-              {hasActiveFilters && <span className="w-2 h-2 rounded-full" style={{ background: ROSE }} />}
-            </button>
-            <div className="flex items-center gap-2">
-              <p className="hidden md:block text-xs font-sans" style={{ color: PINK }}>{pagination.total} products</p>
-              <SortDropdown value={filters.sort} onChange={(v) => updateFilter('sort', v)} />
-            </div>
-          </div>
-
-          {/* Desktop: active chips + sort */}
-          <div className="hidden lg:flex items-center justify-between mb-5">
-            <div className="flex items-center gap-2 flex-wrap">
-              {filters.category && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-                  style={{ background: PEACH_LT, color: ROSE }}>
-                  <Tag size={10} /> {filters.category}
-                  <button onClick={() => updateFilter('category', '')} className="ml-0.5"><X size={10} /></button>
-                </span>
-              )}
-              {filters.filter && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-                  style={{ background: PEACH_LT, color: ROSE }}>
-                  {filters.filter.replace('is','').replace(/([A-Z])/g,' $1').trim()}
-                  <button onClick={() => updateFilter('filter', '')} className="ml-0.5"><X size={10} /></button>
-                </span>
-              )}
-              {filters.search && (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full"
-                  style={{ background: PEACH_LT, color: ROSE }}>
-                  <Search size={10} /> &ldquo;{filters.search}&rdquo;
-                  <button onClick={() => updateFilter('search', '')} className="ml-0.5"><X size={10} /></button>
-                </span>
-              )}
-              <p className="text-xs font-sans" style={{ color: PINK }}>{pagination.total} products</p>
-            </div>
-            <SortDropdown value={filters.sort} onChange={(v) => updateFilter('sort', v)} />
-          </div>
-
-          {/* Grid */}
-          {loading ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-              {Array.from({ length: 10 }).map((_, i) => <SkeletonCard key={i} />)}
-            </div>
-          ) : products.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-24 text-center">
-              <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5" style={{ background: PEACH_LT }}>
-                <Search size={28} strokeWidth={1.5} style={{ color: PINK }} />
+              {/* Banner slider — under the heading, no bottom fade */}
+              <div style={{ marginBottom: 22 }}>
+                <BannerSlider />
               </div>
-              <h3 className="text-xl font-bold mb-2" style={{ fontFamily: 'var(--font-playfair), serif', color: BERRY }}>
-                {filters.search
-                  ? `No results for "${filters.search}"`
-                  : filters.category
-                    ? `No kurtis in "${filters.category}" yet`
-                    : filters.filter
-                      ? `No ${filters.filter.replace('is','').replace(/([A-Z])/g,' $1').trim()} products yet`
-                      : 'No kurtis found'}
-              </h3>
-              <p className="font-sans text-sm mb-6 max-w-xs" style={{ color: MAUVE }}>
-                Try a different search or clear filters to browse all styles.
-              </p>
-              <button onClick={clearFilters} className="inline-flex items-center gap-2 text-white px-6 py-2.5 rounded-full text-sm font-medium font-sans" style={{ background: ROSE }}>
-                <X size={14} /> Clear Filters
-              </button>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {products.map((p) => <ProductCard key={p._id} product={p} />)}
-              </div>
-              {pagination.pages > 1 && (
-                <div className="flex justify-center items-center gap-2 mt-10">
+
+              {/* Toolbar: mobile filter btn + count + chips | sort */}
+              <div style={{
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                gap: 10, flexWrap: 'wrap', marginBottom: 14,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+
+                  {/* Mobile filter toggle — CSS hides on ≥768 */}
                   <button
-                    onClick={() => goToPage(Math.max(1, filters.page - 1))}
-                    disabled={filters.page === 1}
-                    className="flex items-center gap-1 px-4 py-2 rounded-xl border text-sm font-sans disabled:opacity-40 transition-colors"
-                    style={{ borderColor: BORDER, color: BERRY, background: WHITE }}>
-                    <ChevronLeft size={14} /> Prev
+                    className="sp-mob-filter"
+                    onClick={() => setDrawerOpen(true)}
+                    style={{
+                      alignItems: 'center', gap: 6,
+                      fontFamily: 'Poppins,sans-serif', fontSize: 12, fontWeight: 600,
+                      letterSpacing: '0.12em', textTransform: 'uppercase',
+                      color: INK, background: 'none',
+                      border: `1px solid ${RULE}`, padding: '7px 16px', cursor: 'pointer',
+                    }}
+                  >
+                    <SlidersHorizontal size={12} strokeWidth={1.8} />
+                    Filter
+                    {hasActive && <span style={{ width: 6, height: 6, borderRadius: '50%', background: ROSE, display: 'inline-block' }} />}
                   </button>
-                  <span className="px-4 py-2 text-sm font-medium font-sans" style={{ color: BERRY }}>
-                    {filters.page} / {pagination.pages}
+
+                  <span style={{ fontFamily: 'Poppins,sans-serif', fontSize: 12, color: MUTE }}>
+                    {pagination.total} Products
                   </span>
-                  <button
-                    onClick={() => goToPage(Math.min(pagination.pages, filters.page + 1))}
-                    disabled={filters.page === pagination.pages}
-                    className="flex items-center gap-1 px-4 py-2 rounded-xl border text-sm font-sans disabled:opacity-40 transition-colors"
-                    style={{ borderColor: BORDER, color: BERRY, background: WHITE }}>
-                    Next <ChevronRight size={14} />
-                  </button>
-                </div>
-              )}
-            </>
-          )}
-        </div>
-      </div>
 
-      {/* Mobile filter drawer */}
-      <div onClick={() => setSidebarOpen(false)}
-        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-sm transition-opacity duration-300 lg:hidden ${sidebarOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} />
-      <div className={`fixed bottom-0 left-0 right-0 z-50 bg-white rounded-t-3xl shadow-2xl transition-transform duration-300 ease-in-out lg:hidden max-h-[85vh] flex flex-col ${sidebarOpen ? 'translate-y-0' : 'translate-y-full'}`}>
-        <div className="flex justify-center pt-3 pb-1">
-          <div className="w-10 h-1 rounded-full" style={{ background: BORDER }} />
+                  {/* Active chips */}
+                  {filters.filter && (
+                    <Chip label={COLL_OPTS.find(c => c.value === filters.filter)?.label ?? filters.filter}
+                      onRemove={() => updateFilter('filter', '')} />
+                  )}
+                  {filters.category && (
+                    <Chip label={filters.category} onRemove={() => updateFilter('category', '')} />
+                  )}
+                  {filters.size && (
+                    <Chip label={`Size: ${filters.size}`} onRemove={() => updateFilter('size', '')} />
+                  )}
+                  {filters.search && (
+                    <Chip label={`"${filters.search}"`} onRemove={() => updateFilter('search', '')} />
+                  )}
+                  {(filters.minPrice || filters.maxPrice) && (
+                    <Chip
+                      label={`₹${filters.minPrice || 0}–₹${filters.maxPrice || '∞'}`}
+                      onRemove={() => { updateFilter('minPrice', ''); updateFilter('maxPrice', '') }}
+                    />
+                  )}
+                </div>
+
+                <SortControl value={filters.sort} onChange={v => updateFilter('sort', v)} />
+              </div>
+
+              <hr className="sp-hr" style={{ marginBottom: 20 }} />
+
+              {/* Grid / empty / skeleton */}
+              {loading ? (
+                <div className="sp-grid">
+                  {Array.from({ length: 12 }).map((_, i) => <Skel key={i} />)}
+                </div>
+              ) : products.length === 0 ? (
+                /* Empty state — NO clear-filters button here */
+                <div style={{ textAlign: 'center', padding: '72px 0' }}>
+                  <div style={{
+                    width: 50, height: 50, borderRadius: '50%',
+                    border: `1px solid ${RULE}`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    margin: '0 auto 18px',
+                  }}>
+                    <Search size={20} strokeWidth={1.2} color={MUTE} />
+                  </div>
+                  <p style={{ fontFamily: 'Poppins,sans-serif', fontSize: 14, fontWeight: 500, color: INK, marginBottom: 6 }}>
+                    {filters.search
+                      ? `No results for "${filters.search}"`
+                      : filters.category
+                        ? `No products in "${filters.category}"`
+                        : 'No products found'}
+                  </p>
+                  <p style={{ fontFamily: 'Poppins,sans-serif', fontSize: 12, color: MUTE }}>
+                    Try adjusting your filters
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="sp-grid">
+                    {products.map((p, i) => (
+                      <ProductCard key={p._id} product={p} priority={i < 4} />
+                    ))}
+                  </div>
+
+                  {pagination.pages > 1 && (
+                    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 10, marginTop: 48 }}>
+                      <button className="sp-page-btn"
+                        onClick={() => goPage(Math.max(1, filters.page - 1))}
+                        disabled={filters.page === 1}>
+                        <ChevronLeft size={13} /> Prev
+                      </button>
+                      <span style={{ fontFamily: 'Poppins,sans-serif', fontSize: 12, color: MUTE, padding: '0 8px' }}>
+                        {filters.page} / {pagination.pages}
+                      </span>
+                      <button className="sp-page-btn"
+                        onClick={() => goPage(Math.min(pagination.pages, filters.page + 1))}
+                        disabled={filters.page === pagination.pages}>
+                        Next <ChevronRight size={13} />
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
         </div>
-        <FilterSidebar
-          filters={filters}
-          updateFilter={updateFilter}
-          clearFilters={clearFilters}
-          hasActiveFilters={hasActiveFilters}
-          onClose={() => setSidebarOpen(false)}
-          isDrawer={true}
-        />
+      </main>
+
+      {/* ── MOBILE DRAWER ── */}
+      <div className="sp-backdrop"
+        style={{ opacity: drawerOpen ? 1 : 0, pointerEvents: drawerOpen ? 'auto' : 'none' }}
+        onClick={() => setDrawerOpen(false)}
+      />
+      <div className="sp-drawer"
+        style={{ transform: drawerOpen ? 'translateX(0)' : 'translateX(-100%)' }}
+      >
+        <FilterSidebar {...sidebarProps} isDrawer={true} onClose={() => setDrawerOpen(false)} />
       </div>
-    </main>
+    </>
   )
 }
 
 export default function ShopPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <div className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin"
-             style={{ borderColor: ROSE, borderTopColor: 'transparent' }} />
+      <div style={{ minHeight: '100vh', background: WHT, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          border: `2.5px solid ${ROSE}`, borderTopColor: 'transparent',
+          animation: 'spin 0.7s linear infinite',
+        }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     }>
       <ShopContent />
