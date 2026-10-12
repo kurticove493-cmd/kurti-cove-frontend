@@ -24,13 +24,13 @@ import sharp                from 'sharp'
 config({ path: '.env.local' })
 config({ path: '.env' })          // fallback
 
-const CLOUD_NAME  = process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
+const CLOUD_NAME  = process.env.CLOUDINARY_CLOUD_NAME || process.env.NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME
 const API_KEY     = process.env.CLOUDINARY_API_KEY
 const API_SECRET  = process.env.CLOUDINARY_API_SECRET
 
 if (!CLOUD_NAME || !API_KEY || !API_SECRET) {
   console.error('❌  Missing Cloudinary credentials.')
-  console.error('    Set NEXT_PUBLIC_CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in .env.local')
+  console.error('    Set CLOUDINARY_CLOUD_NAME, CLOUDINARY_API_KEY, CLOUDINARY_API_SECRET in .env.local')
   process.exit(1)
 }
 
