@@ -1,0 +1,38 @@
+BUILD RESULT
+===========
+Date: 2025-07-17
+Command: npm run build
+Status: SUCCESS
+
+Output (last 30 lines):
+✓ Compiled successfully in 26.0s
+  Running TypeScript ...
+  Finished TypeScript in 920ms ...
+  Collecting page data using 3 workers ...
+  Generating static pages using 3 workers (19/19) in 1767ms
+  Finalizing page optimization ...
+
+Routes:
+  / (Static)
+  /_not-found (Static)
+  /admin (Static)
+  /admin/orders (Static)
+  /admin/products (Static)
+  /admin/reviews (Static)
+  /admin/sale (Static)
+  /api/admin/upload (Dynamic)
+  /cart (Static)
+  /checkout (Static)
+  /contact (Static)
+  /login (Static)
+  /orders (Static)
+  /orders/[id] (Dynamic)
+  /product/[id] (Dynamic)
+  /profile (Static)
+  /register (Static)
+  /shop (Static)
+  /thank-you/[id] (Dynamic)
+  /verify-otp (Static)
+  /wishlist (Static)
+
+Zero errors. Zero warnings.

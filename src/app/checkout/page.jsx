@@ -140,6 +140,9 @@ export default function CheckoutPage() {
   const deliveryCharge = calcDelivery(totalPrice)
   const finalTotal     = totalPrice + deliveryCharge
 
+  const mounted = useRef(false)
+  useEffect(() => { mounted.current = true }, [])
+
   useEffect(() => {
     API.get('/user/get').then(res => {
       if (res.data.success) {
@@ -147,11 +150,12 @@ export default function CheckoutPage() {
         setSavedAddresses(addrs)
         if (addrs.length === 0) setShowNewForm(true)
       }
-    }).catch(err => {
-      if (err.response?.status === 401) { router.push('/login?redirect=/checkout'); return }
+    }).catch(() => {
+      // 401 or network error — show the new address form.
+      // If the user has no token, validateSync() will redirect at order-placement time.
       setShowNewForm(true)
     })
-  }, [router])
+  }, [])
 
   /* Visibility: handle return from UPI app */
   useEffect(() => {
@@ -204,7 +208,7 @@ export default function CheckoutPage() {
 
   const validateSync = useCallback(() => {
     if (items.length === 0) { setPayError('Your cart is empty.'); return false }
-    const token = typeof window !== 'undefined' ? localStorage.getItem('kc_token') : null
+    const token = (typeof window !== 'undefined' && mounted.current) ? localStorage.getItem('kc_token') : null
     if (!token) {
       setPayError('Please login to place an order.')
       setTimeout(() => router.push('/login?redirect=/checkout'), 1500)
@@ -347,12 +351,12 @@ export default function CheckoutPage() {
                 {(showNewForm || savedAddresses.length===0) && (
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                     {[
-                      { name:'fullName',    label:'Full Name',    placeholder:'Priya Sharma' },
-                      { name:'mobile',      label:'Mobile',       placeholder:'9876543210' },
-                      { name:'pincode',     label:'Pincode',      placeholder:'400001' },
-                      { name:'addressLine', label:'Address Line', placeholder:'House / Street / Area', full:true },
-                      { name:'city',        label:'City',         placeholder:'Mumbai' },
-                      { name:'state',       label:'State',        placeholder:'Maharashtra' },
+                      { name:'fullName',    label:'Full Name',    placeholder:'Enter full name' },
+                      { name:'mobile',      label:'Mobile',       placeholder:'Enter mobile number' },
+                      { name:'pincode',     label:'Pincode',      placeholder:'Enter pincode' },
+                      { name:'addressLine', label:'Address Line', placeholder:'Enter house no., street, area', full:true },
+                      { name:'city',        label:'City',         placeholder:'Enter city' },
+                      { name:'state',       label:'State',        placeholder:'Enter state' },
                     ].map(f => (
                       <div key={f.name} style={{ gridColumn: f.full ? 'span 2' : undefined }}>
                         <Field label={f.label} name={f.name} value={newAddr[f.name]}
@@ -370,7 +374,7 @@ export default function CheckoutPage() {
                   <PayOption key={opt.value}
                     value={opt.value} label={opt.label} logoSrc={opt.logo}
                     active={payMethod===opt.value}
-                    onClick={() => { setPayMethod(opt.value); setPayError(''); setShowQr(false) }}
+                    onClick={() => { setPayMethod(opt.value); setPayError('') }}
                   />
                 ))}
                 {/* COD disabled */}

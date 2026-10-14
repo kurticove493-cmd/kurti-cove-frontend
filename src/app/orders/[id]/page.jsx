@@ -3,28 +3,57 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import API from '../../../utils/Helper'
 import toast from 'react-hot-toast'
-import { ArrowLeft, MapPin, Package } from 'lucide-react'
 
 /* ── Palette ── */
-const ROSE     = '#E05C88'
-const BERRY    = '#7B2447'
-const MAUVE    = '#6B4553'
-const PINK     = '#F8A5B5'
-const BORDER   = '#F5C8D4'
-const PEACH_LT = '#FEF0E3'
-
-const ACCT_SERIF = '"Cormorant Garamond", "Playfair Display", Georgia, serif'
+const INK  = '#141414'
+const MUTE = '#888'
+const RULE = '#e8e8e8'
+const WHT  = '#ffffff'
 
 const STATUS_STEPS = ['placed', 'confirmed', 'shipped', 'out_for_delivery', 'delivered']
 
-const STATUS_STYLES = {
-  placed:           { bg: '#FEF9C3', text: '#92400e' },
-  confirmed:        { bg: '#DBEAFE', text: '#1e40af' },
-  shipped:          { bg: '#E0E7FF', text: '#3730a3' },
-  out_for_delivery: { bg: '#FFEDD5', text: '#9a3412' },
-  delivered:        { bg: '#DCFCE7', text: '#166534' },
-  cancelled:        { bg: '#FEE2E2', text: '#991b1b' },
+const ORDER_STATUS = {
+  placed:           { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  confirmed:        { bg:'#dbeafe', text:'#1e40af', border:'#bfdbfe' },
+  shipped:          { bg:'#e0e7ff', text:'#3730a3', border:'#c7d2fe' },
+  out_for_delivery: { bg:'#ffedd5', text:'#9a3412', border:'#fed7aa' },
+  delivered:        { bg:'#dcfce7', text:'#166534', border:'#bbf7d0' },
+  cancelled:        { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
 }
+const PAY_STATUS = {
+  paid:                 { bg:'#dcfce7', text:'#166534', border:'#bbf7d0' },
+  failed:               { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
+  pending:              { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  pending_verification: { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+}
+
+const PAGE_CSS = `
+  .od { background:#fafafa; min-height:100vh; }
+  .od *, .od *::before, .od *::after { box-sizing:border-box; }
+  .od-card {
+    background:#fff; border:1px solid ${RULE};
+    padding:24px; margin-bottom:16px;
+  }
+  .od-section-title {
+    font-family:Poppins,sans-serif; font-size:11px; font-weight:600;
+    letter-spacing:0.14em; text-transform:uppercase; color:${INK};
+    margin:0 0 16px;
+  }
+  .od-badge {
+    display:inline-block; padding:3px 10px;
+    font-family:Poppins,sans-serif; font-size:10px; font-weight:600;
+    letter-spacing:0.08em; text-transform:uppercase;
+    border-radius:0;
+  }
+  .od-btn-cancel {
+    font-family:Poppins,sans-serif; font-size:10px; font-weight:600;
+    letter-spacing:0.08em; text-transform:uppercase;
+    color:#ef4444; background:none;
+    border:1px solid #fecaca; padding:3px 10px; cursor:pointer;
+    border-radius:0; transition:border-color 0.15s;
+  }
+  .od-btn-cancel:hover { border-color:#ef4444; }
+`
 
 const formatDate = (d) =>
   new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })
@@ -58,214 +87,245 @@ export default function OrderDetailPage() {
   const currentStep = STATUS_STEPS.indexOf(order?.orderStatus)
 
   if (loading) return (
-    <div className="min-h-screen flex items-center justify-center bg-white">
-      <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin"
-           style={{ borderColor: ROSE, borderTopColor: 'transparent' }} />
+    <div style={{ minHeight:'100vh', display:'flex', alignItems:'center',
+      justifyContent:'center', background:'#fafafa' }}>
+      <div style={{ width:28, height:28, borderRadius:'50%',
+        border:`2.5px solid ${INK}`, borderTopColor:'transparent',
+        animation:'spin .7s linear infinite' }} />
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   )
   if (!order) return null
 
-  const st = STATUS_STYLES[order.orderStatus] || { bg: '#F3F4F6', text: '#6B7280' }
+  const oSt = ORDER_STATUS[order.orderStatus] || { bg:'#f3f4f6', text:'#6b7280', border:'#e5e7eb' }
 
   return (
-    <main className="min-h-screen py-10 bg-white">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6">
+    <>
+      <style>{PAGE_CSS}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <main className="od">
+        <div style={{ maxWidth:1000, margin:'0 auto', padding:'32px 16px 64px' }}>
 
-        <button onClick={() => router.push('/orders')}
-          className="flex items-center gap-2 text-sm font-sans mb-6 transition-colors"
-          style={{ color: PINK }}>
-          <ArrowLeft size={14} /> Back to Orders
-        </button>
-
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-8">
-          <div>
-            <h1 className="font-bold text-3xl" style={{ fontFamily: ACCT_SERIF, color: BERRY }}>Order Details</h1>
-            <p className="font-mono text-sm mt-1" style={{ color: PINK }}>#{order._id.slice(-12).toUpperCase()}</p>
+          {/* Breadcrumb / back */}
+          <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:24,
+            fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE }}>
+            <button onClick={() => router.push('/orders')}
+              style={{ background:'none', border:'none', cursor:'pointer', padding:0,
+                fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE }}>
+              My Orders
+            </button>
+            <span>/</span>
+            <span style={{ color:INK }}>Order Details</span>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="px-4 py-1.5 rounded-full text-sm font-semibold font-sans"
-                  style={{ background: st.bg, color: st.text }}>
-              {order.orderStatus.replace('_', ' ').toUpperCase()}
-            </span>
-            {order.orderStatus === 'placed' && (
-              <button onClick={handleCancel}
-                className="text-sm text-red-500 hover:text-red-700 border border-red-200 hover:border-red-400 px-4 py-1.5 rounded-full font-medium font-sans transition-all">
-                Cancel Order
-              </button>
-            )}
+
+          {/* Header */}
+          <div style={{ display:'flex', flexWrap:'wrap', alignItems:'flex-start',
+            justifyContent:'space-between', gap:12, marginBottom:28 }}>
+            <div>
+              <h1 style={{ fontFamily:'"Playfair Display",Georgia,serif', fontSize:28,
+                fontWeight:700, color:INK, margin:'0 0 4px' }}>
+                Order Details
+              </h1>
+              <p style={{ fontFamily:'Poppins,sans-serif', fontSize:11, color:MUTE, margin:0 }}>
+                #{order._id.slice(-12).toUpperCase()}
+              </p>
+            </div>
+            <div style={{ display:'flex', alignItems:'center', gap:10, flexWrap:'wrap' }}>
+              <span className="od-badge"
+                style={{ background:oSt.bg, color:oSt.text, border:`1px solid ${oSt.border}` }}>
+                {order.orderStatus.replace(/_/g, ' ')}
+              </span>
+              {order.orderStatus === 'placed' && (
+                <button className="od-btn-cancel" onClick={handleCancel}>
+                  Cancel Order
+                </button>
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Left — Timeline + Items */}
-          <div className="lg:col-span-2 space-y-5">
+          {/* Main two-column layout */}
+          <div style={{ display:'flex', flexWrap:'wrap', gap:24, alignItems:'flex-start' }}>
 
-            {/* ── ORDER TIMELINE ──────────────────────────────────────────
-                Mobile: vertical stack — dot + label stacked in a column,
-                connector line runs downward between dots.
-                Desktop (sm+): horizontal row, connector line runs rightward.
-            ────────────────────────────────────────────────────────────── */}
-            {order.orderStatus !== 'cancelled' && (
-              <div className="bg-white rounded-[16px] p-5 md:p-6 shadow-card" style={{ border: `1px solid ${BORDER}` }}>
-                <h2 className="font-bold text-lg mb-5 font-sans" style={{ fontFamily: ACCT_SERIF, color: BERRY }}>
-                  Order Timeline
-                </h2>
+            {/* ── LEFT column ── */}
+            <div style={{ flex:'1 1 480px', minWidth:0 }}>
 
-                {/* ── MOBILE: vertical timeline ── */}
-                <div className="flex flex-col gap-0 sm:hidden">
-                  {STATUS_STEPS.map((step, i) => {
-                    const done   = i <= currentStep
-                    const active = i === currentStep
-                    const isLast = i === STATUS_STEPS.length - 1
-                    return (
-                      <div key={step} className="flex items-start gap-3">
-                        {/* Left column: dot + connector */}
-                        <div className="flex flex-col items-center flex-shrink-0" style={{ width: 28 }}>
-                          <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold border-2 flex-shrink-0"
-                            style={{
-                              background:    done ? ROSE : 'white',
-                              borderColor:   done ? ROSE : BORDER,
-                              color:         done ? '#fff' : PINK,
-                              outline:       active ? `2px solid ${ROSE}` : 'none',
-                              outlineOffset: '2px',
-                            }}
-                          >
-                            {done ? '✓' : i + 1}
+              {/* Timeline */}
+              {order.orderStatus !== 'cancelled' && (
+                <div className="od-card">
+                  <p className="od-section-title">Order Timeline</p>
+
+                  {/* Mobile: vertical */}
+                  <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
+                    {STATUS_STEPS.map((step, i) => {
+                      const done   = i <= currentStep
+                      const isLast = i === STATUS_STEPS.length - 1
+                      return (
+                        <div key={step} style={{ display:'flex', alignItems:'flex-start', gap:12 }}>
+                          {/* dot + connector */}
+                          <div style={{ display:'flex', flexDirection:'column',
+                            alignItems:'center', flexShrink:0, width:20 }}>
+                            <div style={{
+                              width:20, height:20,
+                              background: done ? INK : WHT,
+                              border: `2px solid ${done ? INK : RULE}`,
+                              borderRadius:0,
+                              display:'flex', alignItems:'center', justifyContent:'center',
+                              flexShrink:0,
+                            }}>
+                              {done && (
+                                <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                                  <polyline points="1.5,5 4,7.5 8.5,2.5"
+                                    stroke={WHT} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              )}
+                            </div>
+                            {!isLast && (
+                              <div style={{
+                                width:2, flex:1, minHeight:24,
+                                background: i < currentStep ? INK : RULE,
+                              }} />
+                            )}
                           </div>
-                          {!isLast && (
-                            <div className="w-0.5 flex-1 min-h-[24px]"
-                                 style={{ background: i < currentStep ? ROSE : BORDER }} />
-                          )}
+                          {/* label */}
+                          <p style={{
+                            fontFamily:'Poppins,sans-serif', fontSize:12,
+                            color: done ? INK : MUTE,
+                            fontWeight: done ? 600 : 400,
+                            textTransform:'capitalize',
+                            paddingBottom: isLast ? 0 : 20,
+                            margin:0, paddingTop:1, lineHeight:'1.3',
+                          }}>
+                            {step.replace(/_/g, ' ')}
+                          </p>
                         </div>
-                        {/* Right column: label */}
-                        <p className="font-sans text-xs capitalize pb-5 leading-snug pt-1"
-                           style={{ color: done ? BERRY : PINK, fontWeight: done ? 600 : 400 }}>
-                          {step.replace('_', ' ')}
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* ── DESKTOP: horizontal timeline ── */}
-                <div className="hidden sm:flex items-start gap-0">
-                  {STATUS_STEPS.map((step, i) => {
-                    const done   = i <= currentStep
-                    const active = i === currentStep
-                    return (
-                      <div key={step} className="flex-1 flex flex-col items-center min-w-0">
-                        {/* Row: dot + connector */}
-                        <div className="flex items-center w-full">
-                          <div
-                            className="w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold border-2 flex-shrink-0"
-                            style={{
-                              background:    done ? ROSE : 'white',
-                              borderColor:   done ? ROSE : BORDER,
-                              color:         done ? '#fff' : PINK,
-                              outline:       active ? `2px solid ${ROSE}` : 'none',
-                              outlineOffset: '2px',
-                            }}
-                          >
-                            {done ? '✓' : i + 1}
-                          </div>
-                          {i < STATUS_STEPS.length - 1 && (
-                            <div className="flex-1 h-0.5"
-                                 style={{ background: i < currentStep ? ROSE : BORDER }} />
-                          )}
-                        </div>
-                        <p className="text-[10px] font-sans mt-1.5 text-center capitalize w-full px-1"
-                           style={{ color: done ? ROSE : PINK, fontWeight: done ? 600 : 400 }}>
-                          {step.replace('_', ' ')}
-                        </p>
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Items */}
-            <div className="bg-white rounded-[16px] p-6 shadow-card" style={{ border: `1px solid ${BORDER}` }}>
-              <h2 className="font-bold text-lg mb-4 flex items-center gap-2"
-                  style={{ fontFamily: ACCT_SERIF, color: BERRY }}>
-                <Package size={18} style={{ color: ROSE }} />
-                Items ({order.items.length})
-              </h2>
-              <div className="space-y-4">
-                {order.items.map((item, i) => (
-                  <div key={i} className="flex gap-4 items-start pb-4 last:pb-0 last:border-0 border-b"
-                       style={{ borderColor: BORDER }}>
-                    <div className="w-16 h-20 rounded-xl overflow-hidden flex-shrink-0" style={{ background: PEACH_LT }}>
-                      {item.image
-                        // eslint-disable-next-line @next/next/no-img-element
-                        ? <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
-                        : <div className="w-full h-full flex items-center justify-center text-2xl">👗</div>}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-sans font-semibold text-sm" style={{ color: BERRY }}>{item.name}</p>
-                      <p className="font-sans text-xs mt-0.5" style={{ color: PINK }}>Qty: {item.qty}</p>
-                      <p className="font-sans text-xs" style={{ color: PINK }}>₹{item.price.toLocaleString()} each</p>
-                    </div>
-                    <p className="font-bold text-sm flex-shrink-0" style={{ fontFamily: ACCT_SERIF, color: BERRY }}>
-                      ₹{(item.price * item.qty).toLocaleString()}
-                    </p>
+                      )
+                    })}
                   </div>
-                ))}
+                </div>
+              )}
+
+              {/* Items */}
+              <div className="od-card">
+                <p className="od-section-title">Items ({order.items.length})</p>
+                <div>
+                  {order.items.map((item, i) => (
+                    <div key={i} style={{
+                      display:'flex', gap:14, alignItems:'flex-start',
+                      paddingBottom: i < order.items.length - 1 ? 16 : 0,
+                      marginBottom: i < order.items.length - 1 ? 16 : 0,
+                      borderBottom: i < order.items.length - 1 ? `1px solid ${RULE}` : 'none',
+                    }}>
+                      <div style={{ width:56, height:68, background:'#f5f5f5',
+                        overflow:'hidden', flexShrink:0, borderRadius:0 }}>
+                        {item.image
+                          // eslint-disable-next-line @next/next/no-img-element
+                          ? <img src={item.image} alt={item.name}
+                              style={{ width:'100%', height:'100%', objectFit:'cover', display:'block' }} />
+                          : <div style={{ width:'100%', height:'100%', display:'flex',
+                              alignItems:'center', justifyContent:'center', fontSize:22 }}>👗</div>}
+                      </div>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13,
+                          fontWeight:600, color:INK, margin:'0 0 3px' }}>
+                          {item.name}
+                        </p>
+                        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12,
+                          color:MUTE, margin:'0 0 2px' }}>
+                          Qty: {item.qty}
+                        </p>
+                        <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12, color:MUTE, margin:0 }}>
+                          ₹{item.price.toLocaleString()} each
+                        </p>
+                      </div>
+                      <p style={{ fontFamily:'"Playfair Display",Georgia,serif',
+                        fontSize:14, fontWeight:700, color:INK, flexShrink:0, margin:0 }}>
+                        ₹{(item.price * item.qty).toLocaleString()}
+                      </p>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Right — Summary */}
-          <div className="space-y-5">
-            <div className="bg-white rounded-[16px] p-5 shadow-card" style={{ border: `1px solid ${BORDER}` }}>
-              <h2 className="font-bold text-lg mb-3 flex items-center gap-2"
-                  style={{ fontFamily: ACCT_SERIF, color: BERRY }}>
-                <MapPin size={16} style={{ color: ROSE }} /> Delivery Address
-              </h2>
-              <div className="font-sans text-sm space-y-0.5" style={{ color: MAUVE }}>
-                <p className="font-semibold" style={{ color: BERRY }}>{order.address.fullName}</p>
-                <p>{order.address.mobile}</p>
-                <p>{order.address.addressLine}</p>
-                <p>{order.address.city}, {order.address.state}</p>
-                <p>Pincode: {order.address.pincode}</p>
-              </div>
-            </div>
+            {/* ── RIGHT column ── */}
+            <div style={{ width:300, flexShrink:0 }}>
 
-            <div className="bg-white rounded-[16px] p-5 shadow-card" style={{ border: `1px solid ${BORDER}` }}>
-              <h2 className="font-bold text-lg mb-3" style={{ fontFamily: ACCT_SERIF, color: BERRY }}>Payment Info</h2>
-              <div className="font-sans text-sm space-y-2">
-                <div className="flex justify-between" style={{ color: MAUVE }}>
-                  <span>Method</span>
-                  <span className="font-medium uppercase" style={{ color: BERRY }}>{order.paymentMethod}</span>
-                </div>
-                <div className="flex justify-between" style={{ color: MAUVE }}>
-                  <span>Status</span>
-                  <span className="font-medium capitalize"
-                        style={{ color: order.paymentStatus === 'paid' ? '#16a34a' : PINK }}>
-                    {order.paymentStatus}
-                  </span>
-                </div>
-                <hr style={{ borderColor: BORDER }} />
-                <div className="flex justify-between font-bold" style={{ color: BERRY }}>
-                  <span>Total</span>
-                  <span className="text-lg" style={{ fontFamily: ACCT_SERIF }}>
-                    ₹{order.totalAmount.toLocaleString()}
-                  </span>
+              {/* Delivery Address */}
+              <div className="od-card">
+                <p className="od-section-title">Delivery Address</p>
+                <div style={{ fontFamily:'Poppins,sans-serif', fontSize:13 }}>
+                  <p style={{ fontWeight:600, color:INK, margin:'0 0 3px' }}>{order.address.fullName}</p>
+                  <p style={{ color:MUTE, margin:'0 0 2px' }}>{order.address.mobile}</p>
+                  <p style={{ color:MUTE, margin:'0 0 2px' }}>{order.address.addressLine}</p>
+                  <p style={{ color:MUTE, margin:'0 0 2px' }}>{order.address.city}, {order.address.state}</p>
+                  <p style={{ color:MUTE, margin:0 }}>Pincode: {order.address.pincode}</p>
                 </div>
               </div>
-            </div>
 
-            <div className="bg-white rounded-[16px] p-5 shadow-card" style={{ border: `1px solid ${BORDER}` }}>
-              <div className="font-sans text-xs space-y-1.5" style={{ color: PINK }}>
-                <p>Placed on: <span className="font-medium" style={{ color: BERRY }}>{formatDate(order.createdAt)}</span></p>
-                {order.cancelledAt && <p>Cancelled on: <span className="font-medium text-red-500">{formatDate(order.cancelledAt)}</span></p>}
-                {order.deliveredAt && <p>Delivered on: <span className="font-medium text-green-600">{formatDate(order.deliveredAt)}</span></p>}
+              {/* Payment Info */}
+              <div className="od-card">
+                <p className="od-section-title">Payment Info</p>
+                <div style={{ fontFamily:'Poppins,sans-serif', fontSize:13 }}>
+                  <div style={{ display:'flex', justifyContent:'space-between',
+                    marginBottom:8, color:MUTE }}>
+                    <span>Method</span>
+                    <span style={{ fontWeight:600, color:INK, textTransform:'uppercase' }}>
+                      {order.paymentMethod}
+                    </span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between',
+                    marginBottom:12, color:MUTE }}>
+                    <span>Status</span>
+                    {(() => {
+                      const ps = PAY_STATUS[order.paymentStatus] || { bg:'#f3f4f6', text:'#6b7280', border:'#e5e7eb' }
+                      return (
+                        <span className="od-badge"
+                          style={{ background:ps.bg, color:ps.text, border:`1px solid ${ps.border}` }}>
+                          {(order.paymentStatus || 'pending').replace(/_/g,' ')}
+                        </span>
+                      )
+                    })()}
+                  </div>
+                  <div style={{ borderTop:`1px solid ${RULE}`, paddingTop:12,
+                    display:'flex', justifyContent:'space-between', alignItems:'baseline' }}>
+                    <span style={{ fontFamily:'Poppins,sans-serif', fontSize:13,
+                      fontWeight:600, color:INK }}>Total</span>
+                    <span style={{ fontFamily:'"Playfair Display",Georgia,serif',
+                      fontSize:20, fontWeight:700, color:INK }}>
+                      ₹{order.totalAmount.toLocaleString()}
+                    </span>
+                  </div>
+                </div>
               </div>
+
+              {/* Dates */}
+              <div className="od-card">
+                <p className="od-section-title">Dates</p>
+                <div style={{ fontFamily:'Poppins,sans-serif', fontSize:12,
+                  display:'flex', flexDirection:'column', gap:6 }}>
+                  <div>
+                    <span style={{ color:MUTE }}>Placed on: </span>
+                    <span style={{ color:INK, fontWeight:500 }}>{formatDate(order.createdAt)}</span>
+                  </div>
+                  {order.cancelledAt && (
+                    <div>
+                      <span style={{ color:MUTE }}>Cancelled on: </span>
+                      <span style={{ color:'#ef4444', fontWeight:500 }}>{formatDate(order.cancelledAt)}</span>
+                    </div>
+                  )}
+                  {order.deliveredAt && (
+                    <div>
+                      <span style={{ color:MUTE }}>Delivered on: </span>
+                      <span style={{ color:'#16a34a', fontWeight:500 }}>{formatDate(order.deliveredAt)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
-      </div>
-    </main>
+      </main>
+    </>
   )
 }
