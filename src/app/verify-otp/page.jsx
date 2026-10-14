@@ -2,19 +2,16 @@
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDispatch } from 'react-redux'
+import Link from 'next/link'
 import API from '../../utils/Helper'
 import { syncAndLoadCart } from '../../utils/cartHelper'
 import toast from 'react-hot-toast'
 
-/* ── Palette ── */
-const ROSE     = '#E05C88'
-const BERRY    = '#7B2447'
-const MAUVE    = '#6B4553'
-const PINK     = '#F8A5B5'
-const CREAM    = '#FCFAE0'
-const BORDER   = '#F5C8D4'
-const PEACH_LT = '#FEF0E3'
-const CARD     = '#FFFAF5'
+/* ── Same minimal theme as login/register ── */
+const INK  = '#141414'
+const MUTE = '#888'
+const RULE = '#e8e8e8'
+const WHT  = '#ffffff'
 
 function VerifyOtpContent() {
   const router       = useRouter()
@@ -97,86 +94,142 @@ function VerifyOtpContent() {
     }
   }
 
+  const filled = otp.join('').length
+
   return (
-    <main className="min-h-screen flex items-center justify-center py-12 px-4"
-          style={{ background: `linear-gradient(160deg, ${CREAM} 0%, #fff7f0 100%)` }}>
-      <div className="w-full max-w-md">
-        <div className="bg-white rounded-[20px] p-8 text-center"
-             style={{ border: `1.5px solid ${BORDER}`, boxShadow: `0 8px 32px rgba(224,92,136,0.12)` }}>
+    <main style={{
+      minHeight: '100vh', display: 'flex', alignItems: 'center',
+      justifyContent: 'center', background: '#fafafa', padding: '48px 16px',
+    }}>
+      <div style={{ width: '100%', maxWidth: 400 }}>
 
-          {/* Icon */}
-          <div
-            className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
-            style={{ background: `linear-gradient(135deg, ${PINK}, ${ROSE})` }}
-          >
-            <span className="text-white text-2xl">✉</span>
-          </div>
-
-          <h1 className="font-serif text-3xl font-bold mb-2" style={{ color: BERRY }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <Link href="/">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo.png" alt="Kurti Cove"
+              style={{ height: 42, objectFit: 'contain', margin: '0 auto 20px' }} />
+          </Link>
+          <h1 style={{
+            fontFamily: '"Playfair Display",Georgia,serif', fontSize: 26,
+            fontWeight: 700, color: INK, margin: '0 0 6px',
+          }}>
             Verify Your Email
           </h1>
-          <p className="font-sans text-sm mb-2" style={{ color: MAUVE }}>
-            We sent a 6-digit OTP to
+          <p style={{ fontFamily: 'Poppins,sans-serif', fontSize: 12, color: MUTE, margin: 0 }}>
+            Enter the 6-digit code sent to
           </p>
-          <p className="font-sans text-sm font-semibold mb-6 px-3 py-1.5 rounded-full inline-block"
-             style={{ color: BERRY, background: PEACH_LT, border: `1px solid ${BORDER}` }}>
+          <p style={{
+            fontFamily: 'Poppins,sans-serif', fontSize: 13,
+            fontWeight: 600, color: INK, marginTop: 4,
+          }}>
             {email}
           </p>
+        </div>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Card */}
+        <div style={{ background: WHT, border: `1px solid ${RULE}`, padding: '32px 32px 28px' }}>
+
+          <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+
             {/* OTP inputs */}
-            <div className="flex gap-2 justify-center" onPaste={handlePaste}>
-              {otp.map((digit, i) => (
-                <input
-                  key={i}
-                  ref={(el) => (inputRefs.current[i] = el)}
-                  type="text" inputMode="numeric" maxLength={1}
-                  value={digit}
-                  onChange={(e) => handleOtpChange(e.target.value, i)}
-                  onKeyDown={(e) => handleKeyDown(e, i)}
-                  className="w-11 h-13 md:w-12 md:h-14 text-center text-xl font-bold border-2 rounded-xl font-sans outline-none transition-all"
-                  style={{
-                    borderColor: digit ? ROSE : BORDER,
-                    background:  digit ? PEACH_LT : CARD,
-                    color:       BERRY,
-                    height: '3.5rem',
-                  }}
-                />
-              ))}
+            <div>
+              <label style={{
+                display: 'block', fontFamily: 'Poppins,sans-serif', fontSize: 11,
+                fontWeight: 600, letterSpacing: '0.12em', textTransform: 'uppercase',
+                color: MUTE, marginBottom: 14, textAlign: 'center',
+              }}>
+                One-Time Password
+              </label>
+              <div style={{ display: 'flex', gap: 8, justifyContent: 'center' }}
+                onPaste={handlePaste}>
+                {otp.map((digit, i) => (
+                  <input
+                    key={i}
+                    ref={(el) => (inputRefs.current[i] = el)}
+                    type="text"
+                    inputMode="numeric"
+                    maxLength={1}
+                    value={digit}
+                    onChange={(e) => handleOtpChange(e.target.value, i)}
+                    onKeyDown={(e) => handleKeyDown(e, i)}
+                    style={{
+                      width: 44, height: 52,
+                      textAlign: 'center',
+                      fontFamily: 'Poppins,sans-serif',
+                      fontSize: 20, fontWeight: 700,
+                      color: INK,
+                      border: `1px solid ${digit ? INK : RULE}`,
+                      background: WHT,
+                      outline: 'none',
+                      borderRadius: 0,
+                      transition: 'border-color 0.15s',
+                    }}
+                    onFocus={e => e.target.style.borderColor = INK}
+                    onBlur={e  => e.target.style.borderColor = digit ? INK : RULE}
+                  />
+                ))}
+              </div>
             </div>
 
+            {/* Submit button */}
             <button
               type="submit"
-              disabled={loading || otp.join('').length !== 6}
-              className="w-full text-white py-3.5 rounded-xl font-sans font-semibold text-sm transition-all hover:shadow-lg disabled:opacity-60"
-              style={{ background: ROSE }}
+              disabled={loading || filled !== 6}
+              style={{
+                width: '100%', padding: '13px 0',
+                background: (loading || filled !== 6) ? '#ccc' : INK,
+                color: WHT, border: 'none',
+                cursor: (loading || filled !== 6) ? 'not-allowed' : 'pointer',
+                fontFamily: 'Poppins,sans-serif', fontSize: 12,
+                fontWeight: 600, letterSpacing: '0.14em', textTransform: 'uppercase',
+                transition: 'background 0.18s',
+              }}
             >
               {loading ? 'Verifying…' : 'Verify OTP'}
             </button>
           </form>
 
-          <div className="mt-5">
+          {/* Divider */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, margin: '20px 0' }}>
+            <div style={{ flex: 1, height: 1, background: RULE }} />
+            <span style={{ fontFamily: 'Poppins,sans-serif', fontSize: 11, color: MUTE }}>
+              or
+            </span>
+            <div style={{ flex: 1, height: 1, background: RULE }} />
+          </div>
+
+          {/* Resend */}
+          <div style={{ textAlign: 'center' }}>
             {countdown > 0 ? (
-              <p className="font-sans text-xs" style={{ color: MAUVE }}>
-                Resend OTP in{' '}
-                <span className="font-bold" style={{ color: ROSE }}>{countdown}s</span>
+              <p style={{ fontFamily: 'Poppins,sans-serif', fontSize: 13, color: MUTE, margin: 0 }}>
+                Resend code in{' '}
+                <span style={{ color: INK, fontWeight: 600 }}>{countdown}s</span>
               </p>
             ) : (
               <button
                 onClick={handleResend}
                 disabled={resending}
-                className="font-sans text-sm font-medium transition-colors"
-                style={{ color: ROSE }}
+                style={{
+                  background: 'none', border: 'none', cursor: resending ? 'not-allowed' : 'pointer',
+                  fontFamily: 'Poppins,sans-serif', fontSize: 13,
+                  color: INK, fontWeight: 600, textDecoration: 'underline',
+                }}
               >
-                {resending ? 'Sending…' : 'Resend OTP →'}
+                {resending ? 'Sending…' : 'Resend OTP'}
               </button>
             )}
           </div>
-
-          <p className="font-sans text-xs mt-4" style={{ color: MAUVE }}>
-            OTP is valid for 10 minutes. Check spam folder if not received.
-          </p>
         </div>
+
+        {/* Footer note */}
+        <p style={{
+          textAlign: 'center', fontFamily: 'Poppins,sans-serif',
+          fontSize: 11, color: MUTE, marginTop: 16,
+        }}>
+          OTP is valid for 10 minutes · Check spam folder if not received
+        </p>
+
       </div>
     </main>
   )
@@ -185,9 +238,16 @@ function VerifyOtpContent() {
 export default function VerifyOtpPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center" style={{ background: CREAM }}>
-        <div className="w-10 h-10 border-4 border-t-transparent rounded-full animate-spin"
-             style={{ borderColor: ROSE, borderTopColor: 'transparent' }} />
+      <div style={{
+        minHeight: '100vh', display: 'flex',
+        alignItems: 'center', justifyContent: 'center', background: '#fafafa',
+      }}>
+        <div style={{
+          width: 28, height: 28, borderRadius: '50%',
+          border: `2.5px solid ${INK}`, borderTopColor: 'transparent',
+          animation: 'spin .7s linear infinite',
+        }} />
+        <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
       </div>
     }>
       <VerifyOtpContent />
