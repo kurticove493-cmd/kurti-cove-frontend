@@ -62,11 +62,15 @@ export function cldUrl(src, opts = {}) {
 export function normalizeProductImages(images, name = 'Product') {
   if (!images) return []
 
-  // Unwrap JSON string
+  // Unwrap JSON string or space-separated URL string
   let arr = images
   if (typeof arr === 'string') {
     if (arr.startsWith('[') || arr.startsWith('"')) {
+      // JSON-encoded array
       try { arr = JSON.parse(arr) } catch { arr = [arr] }
+    } else if (arr.includes(' https://') || arr.includes(' http://')) {
+      // Space-separated URLs — split on whitespace between URLs
+      arr = arr.trim().split(/\s+/).filter(Boolean)
     } else if (arr.length > 0) {
       arr = [arr]
     } else {
