@@ -11,7 +11,6 @@ import FestiveLooks    from '../components/user/FestiveLooks'
 import CustomerReviews from '../components/user/CustomerReviews'
 import VisitOurStores  from '../components/user/VisitOurStores'
 import FestivalSale    from '../components/user/FestivalSale'
-import Combos          from '../components/user/Combos'
 
 export const metadata = {
   title: 'Kurti Cove — Ethnic Wear for Every Woman',
@@ -57,7 +56,6 @@ export default async function HomePage() {
       <CustomerReviews />
       <VisitOurStores />
       <FestivalSale />
-      <Combos initialData={home?.combos?.length ? home.combos : null} />
     </div>
   )
 }
