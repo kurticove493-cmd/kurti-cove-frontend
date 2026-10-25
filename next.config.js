@@ -1,5 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  compress: true,         // gzip/brotli compression for static assets
+  poweredByHeader: false, // removes X-Powered-By header
   images: {
     remotePatterns: [
       // Cloudinary — product and review images
