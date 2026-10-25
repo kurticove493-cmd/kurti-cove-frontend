@@ -10,10 +10,11 @@ const MUTE = '#888'
 const RULE = '#e8e8e8'
 const WHT  = '#ffffff'
 
-const STATUS_STEPS = ['placed', 'confirmed', 'shipped', 'out_for_delivery', 'delivered']
+const STATUS_STEPS = ['awaiting_payment', 'placed', 'confirmed', 'shipped', 'out_for_delivery', 'delivered']
 
 const ORDER_STATUS = {
-  placed:           { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  awaiting_payment: { bg:'#fef3c7', text:'#92400e', border:'#fde68a' },
+  placed:           { bg:'#fef9c3', text:'#854d0e', border:'#fde68a' },
   confirmed:        { bg:'#dbeafe', text:'#1e40af', border:'#bfdbfe' },
   shipped:          { bg:'#e0e7ff', text:'#3730a3', border:'#c7d2fe' },
   out_for_delivery: { bg:'#ffedd5', text:'#9a3412', border:'#fed7aa' },
@@ -21,10 +22,12 @@ const ORDER_STATUS = {
   cancelled:        { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
 }
 const PAY_STATUS = {
-  paid:                 { bg:'#dcfce7', text:'#166534', border:'#bbf7d0' },
-  failed:               { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
-  pending:              { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
-  pending_verification: { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  paid:                  { bg:'#dcfce7', text:'#166534', border:'#bbf7d0' },
+  failed:                { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
+  rejected:              { bg:'#fee2e2', text:'#991b1b', border:'#fecaca' },
+  pending:               { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  pending_verification:  { bg:'#fef9c3', text:'#92400e', border:'#fde68a' },
+  awaiting_verification: { bg:'#fef3c7', text:'#92400e', border:'#fde68a' },
 }
 
 const PAGE_CSS = `
@@ -102,9 +105,56 @@ export default function OrderDetailPage() {
   return (
     <>
       <style>{PAGE_CSS}</style>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} @keyframes od-pulse{0%,100%{opacity:1}50%{opacity:0.45}}`}</style>
       <main className="od">
         <div style={{ maxWidth:1000, margin:'0 auto', padding:'32px 16px 64px' }}>
+
+          {/* UPI Pending banner */}
+          {['upi','phonepe','googlepay'].includes(order.paymentMethod) &&
+           ['pending','pending_verification','awaiting_verification'].includes(order.paymentStatus) && (
+            <div style={{
+              display:'flex', alignItems:'center', gap:12,
+              background:'#fef9c3', border:'1px solid #fde68a',
+              borderLeft:'4px solid #f59e0b',
+              padding:'14px 16px', marginBottom:20,
+            }}>
+              <div style={{ width:10, height:10, borderRadius:'50%', background:'#f59e0b',
+                flexShrink:0, animation:'od-pulse 1.5s ease infinite' }} />
+              <div>
+                <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13, fontWeight:600,
+                  color:'#92400e', margin:'0 0 2px' }}>
+                  Waiting for Payment Confirmation
+                </p>
+                <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12,
+                  color:'#92400e', margin:0 }}>
+                  Your {order.paymentMethod.toUpperCase()} payment is pending manual verification. Your order will be confirmed once verified.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {/* Payment Rejected banner */}
+          {order.paymentStatus === 'rejected' && (
+            <div style={{
+              display:'flex', alignItems:'flex-start', gap:12,
+              background:'#fef2f2', border:'1px solid #fecaca',
+              borderLeft:'4px solid #dc2626',
+              padding:'14px 16px', marginBottom:20,
+            }}>
+              <div>
+                <p style={{ fontFamily:'Poppins,sans-serif', fontSize:13, fontWeight:600,
+                  color:'#991b1b', margin:'0 0 2px' }}>
+                  Payment Not Verified
+                </p>
+                {order.paymentRejectionReason && (
+                  <p style={{ fontFamily:'Poppins,sans-serif', fontSize:12,
+                    color:'#991b1b', margin:0 }}>
+                    Reason: {order.paymentRejectionReason}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Breadcrumb / back */}
           <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:24,
