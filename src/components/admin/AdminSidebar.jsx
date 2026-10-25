@@ -6,6 +6,7 @@ import { useDispatch } from 'react-redux'
 import { resetCart } from '../../redux/features/CartSlice'
 import API from '../../utils/Helper'
 import { useAdminUser } from './AdminGuard'
+import { useUpiAlertCtx } from './UpiAlertProvider'
 
 const INK  = '#141414'
 const MUTE = '#888'
@@ -42,6 +43,7 @@ export default function AdminSidebar() {
   const pathname  = usePathname()
   const dispatch  = useDispatch()
   const adminUser = useAdminUser()
+  const { pendingCount } = useUpiAlertCtx()
 
   const handleLogout = async () => {
     try { await API.post('/user/logout') } catch {}
@@ -106,11 +108,24 @@ export default function AdminSidebar() {
         <nav style={{ flex:1, padding:'16px 0', overflowY:'auto' }}>
           {NAV.map(({ label, href, Icon }) => {
             const active = pathname.startsWith(href)
+            const isOrders = href === '/admin/orders'
             return (
               <div key={href} style={{ position:'relative' }}>
                 <Link href={href} className={`adm-nav-link${active?' active':''}`}>
                   <Icon size={16} strokeWidth={active ? 2.2 : 1.8} style={{ flexShrink:0 }} />
                   {label}
+                  {isOrders && pendingCount > 0 && (
+                    <span style={{
+                      marginLeft:'auto', minWidth:18, height:18,
+                      background:'#f59e0b', color:'#fff',
+                      borderRadius:9, display:'inline-flex',
+                      alignItems:'center', justifyContent:'center',
+                      fontSize:10, fontWeight:700, padding:'0 5px',
+                      flexShrink:0,
+                    }}>
+                      {pendingCount}
+                    </span>
+                  )}
                 </Link>
               </div>
             )
